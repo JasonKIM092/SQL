@@ -1,0 +1,300 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-09-04 15:44
+[WORKSPACE]
+COUNT=1
+NAME=SQL2
+STMT=285
+-- DDL(CREATE, DROP, ALTER, TRUNCATE) : AUTO COMMIT, COMMIT, ROLLBACK 사용 안함. 즉, ROLLBACK이 불가능하다.
+-- DML(INSERT, DELETE, UPDATE, MERGE) : COMMIT, ROLLBACK 필요, INSERT, DELETE, UPDATE의 WHERE절이랑 SET절에 서브쿼리 사용 가능
+
+--** 참고) ORACLE AUTO COMMIT 현상
+INSERT ...
+ALTER ... -- COMMIT을 하지 않아도 즉시 반영, 이전 DML까지 COMMIT 수행
+;
+
+--** 참고) ALTER ADD 명령어로 컬럼 추가 시 DEFAULT값을 갖는 경우 수행 방식
+-- 1)
+ALTER TABLE DDL_TEST1 ADD (COL11 VARCHAR2(10) DEFAULT 'A');
+-- 2)
+ALTER TABLE DDL_TEST1 ADD (COL11 VARCHAR2(10)); -- NULL을 갖도록 컬럼 추가 후
+UPDATE DDL_TEST1                                -- UPDATE 하는 방식
+   SET COL11 = 'A';
+ALTER TABLE DDL_TEST1 MODIFY (COL11 DEFAULT 'A');
+-- 1),2)번 두개 다 같은 방식이지만, 1)번 방식이 시간이 더 오래 걸린다. 
+
+-- 컬럼 속성을 확인할 수 있는 뷰
+SELECT COLUMN_NAME,     -- 컬럼이름
+       DATA_TYPE,       -- 컬럼 데이터 타입
+       DATA_LENGTH,     -- 문자형일 경우 총 자리수(사이즈)
+       DATA_PRECISION,  -- 숫자형일 경우 총 자리수(사이즈)
+       DATA_SCALE,      -- 숫자형일 경우 소수점 자리수
+       NULLABLE,        -- NOT NULL 여부(N : NOT NULL, Y : NULLABLE)
+       DATA_DEFAULT     -- DEFAULT 값
+  FROM USER_TAB_COLUMNS
+ WHERE TABLE_NAME = 'EMP';
+-- DESC로도 알 수 있지만, DEFAULT값과 같이 조회가 안되는 것도 있음..
+DESC EMP;
+ 
+-- DROP, TRUNCATE, DELETE의 차이
+DROP : 구조 자체를 삭제, DROP 후엔 해당 테이블 조회 불가. DROP TABLE 테이블명;
+       백업본이 있을 경우 복구 가능. 아카이브 로그 모드.
+       DROP TABLE 테이블명 [PURGE]
+       PURGE 옵션 사용 시 삭제된 테이블은 RECYCLEBIN에 남지 않는다.
+
+TRUNCATE : 구조는 두고 데이터를 전체 삭제, 삭제내용 기록하지 않으므로 복원, 복구가 불가능, AUTO COMMIT. TRUNCATE TABLE 테이블명;
+           TRUNCATE TABLE 테이블명;
+           
+DELETE : 구조는 두고 데이터를 조건별로 삭제(전체삭제 가능), 삭제내용 기록, COMMIT 해야 반영;
+
+
+-- DATA DICTIONARY : 데이터 베이스 내에서 데이터베이스의 모든 변경내용, 자원사용현황, 
+-- 세션, 유저에 대한 내용들을 자동으로 수집, 관리하여 저장하는 대상
+
+1) STATIC DICTIONARY VIEW : 객체와 관련된 내용 저장
+   - DBA_XXXX : DBA권한을 가진자만 조회 가능, 데이터베이스 내 모든 객체 내용 확인 가능
+   - ALL_XXXX : 접속한 USER가 접근할 수 있는 객체만 확인 가능
+   - USER_XXXX : 접속한 USER가 소유한 객체만 확인 가능
+   
+2) DYNAMIC PERFORMANCE VIEW : 성능(세션, 자원현황, LOCK현황 등)과 관련된 내용 저장
+    V$XXXX : 동적으로 실시간 성능에 대한 데이터를 수집
+;
+
+SELECT * FROM USER_TABLES;
+SELECT * FROM USER_TAB_COLUMNS;
+SELECT * FROM USER_INDEXES;
+SELECT * FROM USER_IND_COLUMNS;
+SELECT * FROM USER_CONSTRAINTS;
+SELECT * FROM USER_CONS_COLUMNS;
+SELECT * FROM USER_USERS;
+SELECT * FROM USER_VIEWS;
+
+SELECT * FROM V$INSTANCE;
+
+-- 제약조건
+-- 1. NOT NULL
+
+-- 2. UNIQUE(고유키) : 중복 허용 불가
+      - 자동으로 UNIQUE INDEX 생성
+
+-- 3. PRIMARY KEY(기본키) : 테이블 내 유일한 식별자
+      - 테이블 당 하나만 가능
+      - 여러개 컬럼으로 생성 가능
+      - UNIQUE + NOT NULL 조건의 결합
+      - 자동으로 UNIQUE INDEX 생성
+      
+-- 4. FOREIGN KEY : 다른 테이블 데이터(부모)를 참조하여 존재하는 데이터만 허용하는 제약조건, FOREIGN KEY를 생성하기 위한 첫번째 전제조건 : 부모테이블이 존재를 해야한다. 두번째 전제조건 : 부모테이블의 REFERENCE KEY가 반드시 UNIQUE혹은 PRIMARY KEY로 설정이 되어 있어야 한다.
+
+EMP(DEPTNO) - DEPT(DEPTNO)
+자식테이블    부모테이블
+FOREIGN KEY   REFERENCE KEY;   
+
+-- 예제)
+SELECT DEPTNO FROM DEPT;  -- 10,20,30,40번 부서만 정의되어 있음
+INSERT INTO EMP(EMPNO, ENAME, DEPTNO) VALUES (1234,'HONG',50); -- 부서50. 무결성위배(부모키가 없습니다)
+
+-- 5. CHECK : 특정 데이터만 허용
+
+
+-- 예제) JUMUN 테이블과 CAFE_PROD 테이블을 만들고 CAFE_PROD 테이블에 상품번호(NO)가
+-- JUMUN 테이블의 PRODUCT_NO로 저장되도록 테이블을 설계하여라
+
+-- 1) 제약조건 이름 없이
+CREATE TABLE JUMUN 
+(JUMUN_NO   NUMBER(4) PRIMARY KEY,
+ QTY        NUMBER(4) NOT NULL,
+ PRODUCT_NO NUMBER(4) REFERENCES CAFE_PROD(NO));
+ 
+CREATE TABLE CAFE_PROD 
+(NO    NUMBER(4) PRIMARY KEY,
+ NAME  VARCHAR2(10) UNIQUE,
+ PRICE NUMBER(4) NOT NULL);
+ 
+INSERT INTO CAFE_PROD VALUES(1,'AMERICANO',1600);
+INSERT INTO CAFE_PROD VALUES(1,'CAFE LATTE',2000); -- SYS_C0011101에 위배됩니다. 에러 : NO    NUMBER(4) PRIMARY KEY. NO가 겹침
+
+-- 2) 제약조건 이름 부여
+CREATE TABLE CAFE_PROD2 
+(NO    NUMBER(4) CONSTRAINT CAFE_NO_PK PRIMARY KEY,
+ NAME  VARCHAR2(10) UNIQUE,
+ PRICE NUMBER(4) NOT NULL);
+
+CREATE TABLE JUMUN2 
+(JUMUN_NO   NUMBER(4) PRIMARY KEY,
+ QTY        NUMBER(4) NOT NULL,
+ PRODUCT_NO NUMBER(4) REFERENCES CAFE_PROD(NO));
+ 
+-- 제약조건 확인 뷰
+-- 1) 테이블에 컬럼마다 설정된 제약조건 이름과 종류 확인
+SELECT * 
+  FROM USER_CONSTRAINTS
+ WHERE TABLE_NAME = 'CAFE_PROD'; -- 어떠한 컬럼인지(컬럼이름. 즉 컬럼 정보) 알 수 없다. 어떤 제약조건이 걸려잇는지만 알 수 있다.
+ 
+-- 2) 제약조건 이름마다 어떤 컬럼에 설정되어 있는지 확인
+SELECT *
+  FROM USER_CONS_COLUMNS
+ WHERE TABLE_NAME = 'CAFE_PROD';
+ 
+ TABLE_NAME,
+ CONSTRAINT_NAME,
+ CONSTRAINT_TYPE, -- P:PRIMARY KEY, U:UNIQUE, C:CHECK OR NOT NULL, F:FOREIGN KEY
+ SEARCH_CONDITION -- CHECK 조건(일반조건 또는 NOT NULL조건)
+;
+ 
+-- 3) 테이블명, 컬럼명, 제약조건이름, 제약조건 종류 확인(조인필요)
+SELECT C1.TABLE_NAME,
+       C2.COLUMN_NAME,
+       C1.CONSTRAINT_NAME,
+       C1.CONSTRAINT_TYPE, -- P:PRIMARY KEY, U:UNIQUE, C:CHECK OR NOT NULL, F:FOREIGN KEY
+       C1.SEARCH_CONDITION -- CHECK 조건(일반조건 또는 NOT NULL조건)
+  FROM USER_CONSTRAINTS C1, USER_CONS_COLUMNS C2
+ WHERE C1.CONSTRAINT_NAME = C2.CONSTRAINT_NAME
+   AND 'SYS_C0011101'= C1.CONSTRAINT_NAME;
+
+
+--문제1) 다음은 웹 사이트의 게시판을 사용하는 회원을 관리하기 위한 테이블 레이아웃이다.
+--회원테이블(MEMBER2)을 생성하여라.
+CREATE TABLE MEMBER2
+(USERID   VARCHAR2(10) CONSTRAINT USER_ID_PK   PRIMARY KEY,
+ USERNAME VARCHAR2(10) CONSTRAINT USER_NAME_NN NOT NULL,
+ PASSWD   VARCHAR2(10) CONSTRAINT PASSWORD_NN  NOT NULL,
+ IDNUM    VARCHAR2(13) CONSTRAINT ID_NUMBER_UK UNIQUE,
+ PHONE    NUMBER(13),
+ ADDRESS  VARCHAR2(20),
+ REGDATE  DATE DEFAULT SYSDATE,
+ INTEREST VARCHAR2(15));
+ 
+ SELECT * FROM MEMBER2;
+ 
+ INSERT INTO MEMBER2 VALUES('WHO_AM_I','JAY KIM','123456789','9010011234567',01012345678,'SEOUL_ITEAWON',NULL,'GYM');
+ UPDATE MEMBER2 SET REGDATE = NULL;
+ DELETE FROM MEMBER2;
+ INSERT INTO MEMBER2 VALUES('DOCTOR_WHO','JASON KIM','987654321','9112251234567',01000000000,'SEOUL_GANGNAM',NULL,'GYM');
+ INSERT INTO MEMBER2 VALUES('CACAO','JASON KIM','1!2@3#4$','8901231234567',01011112222,'SEOUL_SEOCHO',NULL,'GYM');
+
+DESC MEMBER2;
+
+SELECT * 
+  FROM USER_CONSTRAINTS
+ WHERE TABLE_NAME = 'MEMBER2';
+ 
+SELECT *
+  FROM USER_CONS_COLUMNS
+ WHERE TABLE_NAME = 'MEMBER2';
+ 
+--문제2) 다음 웹게시판(BOARD) 테이블 레이아웃을 참조하여
+--테이블과 무결성 제약조건을 생성하여라.
+CREATE TABLE BOARD
+(NO      NUMBER(4)    CONSTRAINT 게시물번호 PRIMARY KEY,
+ SUBJECT VARCHAR2(50) CONSTRAINT 제목       NOT NULL,
+ CONTENT VARCHAR2(100),
+ RDATE   DATE,
+ USERID  VARCHAR2(10) CONSTRAINT USER_ID_FK REFERENCES MEMBER2(USERID));
+ 
+ DESC BOARD;
+
+SELECT * 
+  FROM USER_CONSTRAINTS
+ WHERE TABLE_NAME = 'BOARD';
+ 
+SELECT *
+  FROM USER_CONS_COLUMNS
+ WHERE TABLE_NAME = 'BOARD';
+ 
+
+-- 제약조건 추가
+ALTER TABLE 테이블명 ADD CONSTRAINT 제약조건이름 제약조건종류(컬럼);
+
+-- 제약조건 삭제
+ALTER TABLE 테이블명 DROP CONSTRAINT 제약조건이름;
+
+
+-- 예제) EMP테이블과 DEPT테이블의 백업 테이블을 만들고 제약조건을 추가하여라
+-- EMP_TEST(DEPTNO) -> DEPT_TEST(DEPTNO) 참조되도록 제약조건 설정
+--1) 테이블 생성
+CREATE TABLE EMP_TEST AS SELECT * FROM EMP;
+CREATE TABLE DEPT_TEST AS SELECT * FROM DEPT;
+
+--2) 기본 제약조건 추가
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_EMPNO_PK PRIMARY KEY(EMPNO);
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_ENAME_UK UNIQUE(ENAME);
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_JOB_NN NOT NULL(JOB); -- 에러발생 : NOT NULL은 ALTER TABLE로 변경 불가하고 MODIFY로만 가능하다!!
+ALTER TABLE EMP_TEST MODIFY (JOB CONSTRAINT EMP_JOB_NN NOT NULL); -- 이게 맞는 문법인데 현재 JOB컬럼에 NULL이 있다.
+ALTER TABLE DEPT_TEST MODIFY (DNAME CONSTRAINT EMP_DNAME_NN NOT NULL);
+
+--3) FOREIGN KEY 추가
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_DEPTNO_FK FOREIGN KEY(DEPTNO) REFERENCES DEPT_TEST(DEPTNO); -- 에러 발생 : FOREIGN KEY를 생성하기 위한 첫번째 전제조건 : 부모테이블이 존재를 해야한다. 두번째 전제조건 : 부모테이블의 REFERENCE KEY가 반드시 UNIQUE혹은 PRIMARY KEY로 설정이 되어 있어야 한다.
+ALTER TABLE DEPT_TEST ADD CONSTRAINT DEPT_DEPTNO_PK PRIMARY KEY(DEPTNO); -- 위의 조건을 실행하려면 이 조건을 먼저 실행시켜야 한다!!! 부모테이블의 REFERENCE KEY가 반드시 UNIQUE혹은 PRIMARY KEY로 설정이 되어 있어야 한다.
+
+
+ALTER TABLE DEPT_TEST ADD CONSTRAINT DEPT_DEPTNO_PK PRIMARY KEY(DEPTNO);
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_DEPTNO_FK FOREIGN KEY(DEPTNO) REFERENCES DEPT_TEST(DEPTNO); 
+
+-- FOREIGN KEY 특징
+--1) REFERENCE KEY에 존재하지 않는 대상의 INSERT, UPDATE 불가
+UPDATE EMP_TEST
+   SET DEPTNO = 50
+ WHERE ENAME = 'SMITH';
+ 
+--[참고]
+INSERT INTO EMP_TEST(EMPNO, ENAME) VALUES(1233,'HONGA'); -- FOREIGN KEY NULL 삽입 가능. 단, 해당 컬럼에 NOT NULL설정이 안 되어있어야 한다.
+INSERT INTO EMP_TEST(EMPNO, ENAME) VALUES(1235,NULL); -- UNIQUE KEY NULL 삽입 가능. 단, 해당 컬럼에 NOT NULL설정이 안 되어있어야 한다.
+
+CREATE TABLE STUDENT_3 AS SELECT * FROM STUDENT;
+DESC STUDENT_3; -- STUDENT 테이블과 차이점이 STUDNO의 NOT NULL여부이다. 이유 : STUDNO 가 PK키라서 자동으로 NOT NULL이 잡힌다. 즉, 원래 STUDENT에서 제약조건이 NOT NULL이 아니라 PRIMARY로 잡힌거다. PRIMARY = NOT NULL + UNIQUE. 테이블 복제시 따라오는 속성은 컬럼이름, 컬럼데이터구조, NOT NULL이다. 나머지는 안따라온다. 제약조건, 인덱스, 디폴트값 안따라감.
+                -- 테이블 복제시 제약조건은 복제되지 않고, NOT NULL속성만 복제(DEFAULT값, 인덱스도 복제되지 않음)
+DESC STUDENT;
+
+--2) 자식테이블의 FOREIGN KEY에서 가지고 있는 데이터를 부모테이블에서 DELETE불가
+DELETE FROM DEPT_TEST
+ WHERE DEPTNO =10;
+
+-- FOREIGN KEY 옵션
+--1) ON DELETE CASCADE : 자식 레코드도 함께 삭제 처리
+ALTER TABLE EMP_TEST DROP CONSTRAINT EMP_DEPTNO_FK;  -- 해당 옵션을 실행시키려면 제약조건이 걸려있을 경우 제약조건 삭제가 필요하다
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_DEPTNO_FK FOREIGN KEY(DEPTNO)
+                                                  REFERENCES DEPT_TEST(DEPTNO)
+                                                  ON DELETE CASCADE; 
+
+DELETE FROM DEPT_TEST
+ WHERE DEPTNO =10;
+
+SELECT * FROM EMP_TEST;
+
+--2) ON DELETE SET NULL : 자식 레코드는 NULL로 업데이트
+ALTER TABLE EMP_TEST DROP CONSTRAINT EMP_DEPTNO_FK;  -- 해당 옵션을 실행시키려면 제약조건이 걸려있을 경우 제약조건 삭제가 필요하다
+ALTER TABLE EMP_TEST ADD CONSTRAINT EMP_DEPTNO_FK FOREIGN KEY(DEPTNO)
+                                                  REFERENCES DEPT_TEST(DEPTNO)
+                                                  ON DELETE SET NULL;  -- 만약 자식테이블의 ON DELETE SET NULL를 실행하려는 컬럼이 NOT NULL 설정이 되어있다면 해당 명령어는 실행할 수 없다.
+                                                  
+DELETE FROM DEPT_TEST
+ WHERE DEPTNO = 20;
+ 
+SELECT * FROM EMP_TEST;
+COMMIT;
+
+-- 제약조건 관리
+1) DISABLE
+ALTER TABLE 테이블명 DISABLE [옵션] CONSTRAINT 제약조건이름;
+- NOVALIDATE : 기본옵션으로 제약조건에 대한 데이터 검사를 하지 않음
+- VALIDATE : 제약조건에 대한 데이터 검사를 함 -- DISABLE에는 논리상 안맞아서 그냥 신경안써도 댐
+
+2) ENABLE
+- NOVALIDATE : ENABLE 시점 이전 데이터에 대한 데이터 검사를 하지 않음
+- VALIDATE : 기본옵션, ENABLE 시점 이전 데이터에 대한 데이터 검사를 함
+;
+
+--1. STUDENT3 테이블을 만들고 비만여부를 나타내는 컬럼을 새로 추가하고,
+-- 각 학생들의 비만정보를 UPDATE하여라.
+--비만여부는 체중이 표준체중보다 크면 과체중, 작으면 저체중, 같으면 표준으로 분류하여라.
+-- * 표준체중 = (키-100)*0.9
+create table student3
+as
+select * from student;
+select * from student;
+insert into student3
+
+
+--2. USER_TAB_COLUMNS 뷰를 사용하여 DESC EMP 결과와 동일하게 출력

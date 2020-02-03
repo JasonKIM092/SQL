@@ -1,0 +1,377 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-09-06 12:45
+[WORKSPACE]
+COUNT=3
+NAME=SQL1
+STMT=122
+--1. 다음을 수행 한 후 중복된 데이터를 삭제하되 한 건은 남기도록 하여라(전부삭제X)
+create table STUDENT_TEST as select * from STUDENT;
+insert into STUDENT_TEST select * from STUDENT where deptno1 = 101;
+insert into STUDENT_TEST select * from STUDENT where deptno1 = 101;
+commit;
+
+create table STUDENT_TEST1 as select * from STUDENT;
+insert into STUDENT_TEST1 select * from STUDENT where deptno1 = 101;
+insert into STUDENT_TEST1 select * from STUDENT where deptno1 = 101;
+commit;
+
+SELECT * FROM STUDENT_TEST;
+
+SELECT DISTINCT ROWID, STUDNO, NAME, GRADE, HEIGHT, WEIGHT
+  FROM STUDENT_TEST
+ WHERE DEPTNO1 = 101
+ ORDER BY NAME;
+ 
+DELETE FROM STUDENT_TEST
+ WHERE ROWID LIKE 'AAASOdAAEAAAARW%';
+
+-- 답
+create table STUDENT_TEST as select * from STUDENT;
+insert into STUDENT_TEST select * from STUDENT where deptno1 = 101;
+insert into STUDENT_TEST select * from STUDENT where deptno1 = 101;
+commit;
+
+SELECT * FROM STUDENT_TEST;
+
+DELETE FROM STUDENT_TEST
+ WHERE STUDNO IN (SELECT STUDNO
+                    FROM STUDENT_TEST
+                   GROUP BY STUDNO
+                  HAVING COUNT(STUDNO) >= 2); -- 해당 쿼리는 3개씩 있는 데이터는 3개 다 지우는것.
+
+SELECT STUDNO, ROWID
+  FROM STUDENT_TEST
+ WHERE STUDNO = 9711;
+
+DELETE FROM STUDENT_TEST S1
+ WHERE ROWID != (SELECT MAX(ROWID)
+                   FROM STUDENT_TEST S2
+                  WHERE S1.STUDNO = S2.STUDNO
+                  GROUP BY STUDNO -- 생략가능. 상호연관 서브쿼리.
+                 HAVING COUNT(STUDNO) >= 2);
+                  
+
+--2. 다음과 같은 정보를 갖는 쿼리 작성(뷰들 활용)
+--테이블명     pk이름          pk컬럼     인덱스수
+--EMP2	    SYS_C0011047	   DEPTNO	        2
+--STUDENT	SYS_C0011043	   GRADE	        8
+--TEST       .                  .               0
+
+답;
+SELECT *
+  FROM TAB; -- 또는 SELECT * FROM USER_TABLES;
+
+--  USER_INDEXES - USER_TABLES - USER_CONS_COLUMNS(+) - USER_CONSTRAINTS(+)
+
+SELECT TABLE_NAME
+  FROM USER_TABLES -- 더 상위개념
+ MINUS
+SELECT TABLE_NAME
+  FROM USER_CONS_COLUMNS;
+
+--DEPT PK_DEPT DEPTNO
+
+SELECT T.TABLE_NAME, 
+       C.CONSTRAINT_NAME PK이름, 
+       C.COLUMN_NAME PK컬럼,
+       COUNT(I.INDEX_NAME) 인덱스수
+  FROM USER_TABLES T, USER_CONS_COLUMNS C, USER_CONSTRAINTS C2, USER_INDEXES I
+ WHERE T.TABLE_NAME = C.TABLE_NAME(+)
+   AND C.CONSTRAINT_NAME = C2.CONSTRAINT_NAME(+)
+   AND T.TABLE_NAME = I.TABLE_NAME(+)
+   AND C2.CONSTRAINT_TYPE(+) = 'P'  -- 상수랑 연결이 되어 있어도 (+)를 붙이면 아우터조인이 실행된다.
+ GROUP BY T.TABLE_NAME, C.CONSTRAINT_NAME, C.COLUMN_NAME;
+
+
+--3. student 테이블을 이용하여 적정체중이 75 이상인 사람의 수를 구하는
+-- 쿼리를 작성하고 해당 쿼리가 인덱스를  정상적으로 scan하도록
+-- 만들어라(인덱스 추가 생성 가능)
+-- 단, 적정체중은 (키 - 100)*0.9를 의미한다.
+SELECT * FROM STUDENT;
+SELECT (HEIGHT-100)*0.9 BIMANDO, COUNT(STUDNO)
+  FROM STUDENT
+ WHERE (HEIGHT-100)*0.9 >= 75
+ GROUP BY (HEIGHT-100)*0.9;
+
+CREATE INDEX IDX_STD_BMD_FBI ON STUDENT((HEIGHT-100)*0.9);
+
+--답
+create index idx_std_grade_height_JJ on STUDENT(height);
+SELECT COUNT(*)  -- 컬럼에 변형이 있는 경우에는 create index idx_std_grade_height on STUDENT(grade, height); 이러한 인덱스를 거치지 않을 확률이 거의 대부분이다. COUNT(*)는 인덱스를 타지 않는다. 별로 좋지 않다.
+  FROM STUDENT
+ WHERE (HEIGHT-100)*0.9 > 75;
+ 
+ 
+SELECT COUNT(HEIGHT) -- COUNT(*)보단 COUNT(HEIGHT)이 더 좋다.
+  FROM STUDENT
+ WHERE HEIGHT > 75/0.9 + 100;
+
+
+CREATE INDEX IDX_STD_BMD_FBI ON STUDENT((HEIGHT-100)*0.9);
+SELECT COUNT(HEIGHT)
+  FROM STUDENT
+ WHERE (HEIGHT - 100)*0.9 > 75; -- FBI성능이나 위의 성능이나 동일하지만, 인덱스 관리 측면에서는 아래 4번과 동일하게 만드는 것이 더 좋다.
+
+--4. 다음 인덱스를 생성한 후 아래 쿼리가 해당 인덱스를 스캔할 수 있도록 변경하여라.
+DROP INDEX idx_std_grade_height_JJ;
+create index idx_std_grade_height on STUDENT(grade, height); -- 인덱스의 선두컬럼이 WHERE절 조건에 선언되어 있지 않으면 인덱스를 거치지 않는다.
+
+select name, studno
+  from student
+ where height > 178; -- 선두컬럼이 선언되지 않아서 테이블 스캔이 발생한 것이다.
+ 
+SELECT NAME, STUDNO
+  FROM STUDENT
+ WHERE height > 178
+   AND GRADE > 0; -- 꼼수임 ㅋㅋ 튜닝 ㅋㅋ 쨋든 선두컬럼이 선언이 되었으므로 인덱스 레인지 스캔을 거친다.
+   
+
+VAR=0
+NAME=SQL2
+STMT=86
+-- 시노님
+CREATE PUBLIC SYNONYM 별칭 FOR 테이블명;
+CREATE PUBLIC SYNONYM STUDENT FOR SCOTT.STUDENT;
+
+--** PUBLIC 옵션 : SYNONYM을 만든 유저 외 다른 유저도 해당 별칭을 사용하게 함
+--                 PUBLIC 옵션으로 시노님을 만드려면 일정 이상의 권한이 있어야 함
+
+-- 옵션이 없으면 CREATE SYNONYM 별칭 FOR 테이블명; 프라이빗 시노님만 가능하다.
+
+-- 시노님 확인
+SELECT *
+  FROM ALL_SYNONYMS; -- USER_는 본인소유이다. PUBLIC은 ALL_
+ 
+ SELECT *
+   FROM ALL_SYNONYMS
+  WHERE TABLE_NAME = 'EMP';
+
+SELECT *
+  FROM DBA_TABLES -- SYSTEM계정에서만 가능.
+ WHERE OWNER IN ('SCOTT','HR');
+
+CREATE PUBLIC SYNONYM STUDENT FOR SCOTT.STUDENT;
+
+-- 연습문제) SYSTEM 계정으로 접속, DBA_TABLES 뷰를 사용하여
+-- SCOTT계정과 HR계정 소유의 테이블에
+-- 대해 PUBLIC SYNONYM을 생성하는 문장을 매 행마다 출력, 전체 실행(F5)
+
+SELECT 'CREATE OR REPLACE PUBLIC SYNONYM '||TABLE_NAME||' FOR '||OWNER||'.'||TABLE_NAME||';'
+  FROM DBA_TABLES
+ WHERE OWNER IN ('SCOTT','HR');
+ 
+CREATE OR REPLACE PUBLIC SYNONYM DEPT FOR SCOTT.DEPT;
+CREATE OR REPLACE PUBLIC SYNONYM EMP FOR SCOTT.EMP;
+CREATE OR REPLACE PUBLIC SYNONYM BONUS FOR SCOTT.BONUS;
+CREATE OR REPLACE PUBLIC SYNONYM SALGRADE FOR SCOTT.SALGRADE;
+CREATE OR REPLACE PUBLIC SYNONYM LOCATIONS FOR HR.LOCATIONS;
+CREATE OR REPLACE PUBLIC SYNONYM PROFESSOR FOR SCOTT.PROFESSOR;
+CREATE OR REPLACE PUBLIC SYNONYM DEPARTMENT FOR SCOTT.DEPARTMENT;
+CREATE OR REPLACE PUBLIC SYNONYM STUDENT FOR SCOTT.STUDENT;
+CREATE OR REPLACE PUBLIC SYNONYM EMP2 FOR SCOTT.EMP2;
+CREATE OR REPLACE PUBLIC SYNONYM DEPT2 FOR SCOTT.DEPT2;
+CREATE OR REPLACE PUBLIC SYNONYM CAL FOR SCOTT.CAL;
+CREATE OR REPLACE PUBLIC SYNONYM GIFT FOR SCOTT.GIFT;
+CREATE OR REPLACE PUBLIC SYNONYM GOGAK FOR SCOTT.GOGAK;
+CREATE OR REPLACE PUBLIC SYNONYM HAKJUM FOR SCOTT.HAKJUM;
+CREATE OR REPLACE PUBLIC SYNONYM EXAM_01 FOR SCOTT.EXAM_01;
+CREATE OR REPLACE PUBLIC SYNONYM P_GRADE FOR SCOTT.P_GRADE;
+CREATE OR REPLACE PUBLIC SYNONYM REG_TEST FOR SCOTT.REG_TEST;
+CREATE OR REPLACE PUBLIC SYNONYM P_01 FOR SCOTT.P_01;
+CREATE OR REPLACE PUBLIC SYNONYM P_02 FOR SCOTT.P_02;
+CREATE OR REPLACE PUBLIC SYNONYM PT_01 FOR SCOTT.PT_01;
+CREATE OR REPLACE PUBLIC SYNONYM PT_02 FOR SCOTT.PT_02;
+CREATE OR REPLACE PUBLIC SYNONYM P_TOTAL FOR SCOTT.P_TOTAL;
+CREATE OR REPLACE PUBLIC SYNONYM DML_ERR_TEST FOR SCOTT.DML_ERR_TEST;
+CREATE OR REPLACE PUBLIC SYNONYM TEST_NOVALIDATE FOR SCOTT.TEST_NOVALIDATE;
+CREATE OR REPLACE PUBLIC SYNONYM TEST_VALIDATE FOR SCOTT.TEST_VALIDATE;
+CREATE OR REPLACE PUBLIC SYNONYM TEST_ENABLE FOR SCOTT.TEST_ENABLE;
+CREATE OR REPLACE PUBLIC SYNONYM PRODUCT FOR SCOTT.PRODUCT;
+CREATE OR REPLACE PUBLIC SYNONYM PANMAE FOR SCOTT.PANMAE;
+CREATE OR REPLACE PUBLIC SYNONYM MEMBER FOR SCOTT.MEMBER;
+CREATE OR REPLACE PUBLIC SYNONYM REG_TEST2 FOR SCOTT.REG_TEST2;
+CREATE OR REPLACE PUBLIC SYNONYM PLAN_TABLE FOR SCOTT.PLAN_TABLE;
+CREATE OR REPLACE PUBLIC SYNONYM TRIM_TEST FOR SCOTT.TRIM_TEST;
+CREATE OR REPLACE PUBLIC SYNONYM EMP_GROUP FOR SCOTT.EMP_GROUP;
+CREATE OR REPLACE PUBLIC SYNONYM EMP_BACKUP FOR SCOTT.EMP_BACKUP;
+CREATE OR REPLACE PUBLIC SYNONYM DDL_TEST1 FOR SCOTT.DDL_TEST1;
+CREATE OR REPLACE PUBLIC SYNONYM CAFE_PROD FOR SCOTT.CAFE_PROD;
+CREATE OR REPLACE PUBLIC SYNONYM JUMUN FOR SCOTT.JUMUN;
+CREATE OR REPLACE PUBLIC SYNONYM EMP_TEST FOR SCOTT.EMP_TEST;
+CREATE OR REPLACE PUBLIC SYNONYM DEPT_TEST FOR SCOTT.DEPT_TEST;
+CREATE OR REPLACE PUBLIC SYNONYM EMP_3 FOR SCOTT.EMP_3;
+CREATE OR REPLACE PUBLIC SYNONYM STUDENT_3 FOR SCOTT.STUDENT_3;
+CREATE OR REPLACE PUBLIC SYNONYM STUDENT3 FOR SCOTT.STUDENT3;
+CREATE OR REPLACE PUBLIC SYNONYM STUDENT4 FOR SCOTT.STUDENT4;
+CREATE OR REPLACE PUBLIC SYNONYM MEMBER2 FOR SCOTT.MEMBER2;
+CREATE OR REPLACE PUBLIC SYNONYM BOARD FOR SCOTT.BOARD;
+CREATE OR REPLACE PUBLIC SYNONYM STUDENT_TEST FOR SCOTT.STUDENT_TEST;
+CREATE OR REPLACE PUBLIC SYNONYM STUDENT_TEST1 FOR SCOTT.STUDENT_TEST1;
+CREATE OR REPLACE PUBLIC SYNONYM COUNTRIES FOR HR.COUNTRIES;
+CREATE OR REPLACE PUBLIC SYNONYM EMPLOYEES FOR HR.EMPLOYEES;
+CREATE OR REPLACE PUBLIC SYNONYM REGIONS FOR HR.REGIONS;
+CREATE OR REPLACE PUBLIC SYNONYM JOB_HISTORY FOR HR.JOB_HISTORY;
+CREATE OR REPLACE PUBLIC SYNONYM DEPARTMENTS FOR HR.DEPARTMENTS;
+CREATE OR REPLACE PUBLIC SYNONYM JOBS FOR HR.JOBS;
+
+
+VAR=0
+NAME=SQL3
+STMT=105
+-- VIEW
+CREATE [OR REPLACE] VIEW 뷰이름
+AS
+서브쿼리;
+
+--예제) STUDENT 테이블에서 학생이름, 학년, 학과번호를 조회하는 뷰를 생성(SCOTT에서 수행)
+CREATE VIEW VW_STD
+AS
+SELECT NAME, GRADE, DEPTNO1
+  FROM STUDENT;
+  
+SELECT * FROM VW_STD;
+
+--VIEW를 통한 원본 테이블 조회/수정 가능 : 싱글뷰일때만 가능. 복합뷰는 불가. 
+UPDATE VW_STD
+   SET DEPTNO1=102
+ WHERE NAME = '서진수';
+ ROLLBACK;
+ 
+-- 뷰를 통해 조회하는 시점은 최신시점이다. 즉, 원본테이블에서 수정한 결과가 뷰에도 그대로 나타난다는 것이다. 이유: 저장공간을 갖는 데이터가 아니라 실행시킬때마다 해당 테이블에서 갖고오는 것이다.
+
+-- 생성된 VIEW 확인
+SELECT *
+  FROM USER_VIEWS;
+  
+CREATE VIEW VW_STD(STD_NAME, STD_GRADE, STD_DEPTNO1) -- 컬럼 이름 바꾸는 방법1. SELECT절과 순서 맞출 것!!
+AS
+SELECT NAME, GRADE, DEPTNO1
+  FROM STUDENT;
+  
+
+CREATE VIEW VW_STD
+AS
+SELECT NAME AS STD_NAME, GRADE AS STD_GRADE, DEPTNO1 AS STD_DEPTNO1  -- 컬럼 이름 바꾸는 방법2.
+  FROM STUDENT;
+  
+SELECT * FROM VW_STD;
+
+
+-- 연습문제) STUDENT테이블의 학생이름, 학년, 학과번호, 시험성적, 학점 조회가 바로 가능한
+-- 뷰 생성(뷰 이름 자유)
+권한 GRANT SELECT ON TABLE TO SCOTT; : 즉시반영
+롤   GRANT DBA TO SCOTT; : 재접속 후 반영
+;
+
+CREATE OR REPLACE VIEW VW_SEHA
+AS
+SELECT S.NAME AS "학생이름", S.GRADE AS "학년", S.DEPTNO1 AS "학과번호", E.TOTAL AS "시험성적", H.GRADE AS "학점"  -- 열 명(이름)이 중복되었다. GRADE. ALIAS사용할것
+  FROM STUDENT S, EXAM_01 E, HAKJUM H
+ WHERE S.STUDNO = E.STUDNO
+   AND E.TOTAL BETWEEN H.MIN_POINT AND H.MAX_POINT;
+
+SELECT * FROM VW_SEHA;
+
+SELECT * FROM STUDENT;
+SELECT * FROM EXAM_01;
+SELECT * FROM HAKJUM;
+
+UPDATE VW_SEHA
+   SET 학점 = 'A0'
+ WHERE 학생이름 = '서진수';  -- 키-보존된것이 아닌 테이블로 대으안 열을 수정할 수 없습니다. 복합뷰의 수정은 여러 컬럼에 대응관계를 같는 컬럼일 경우 수정이 불가능하다. 싱글뷰만 가능!! 그냥 대체적으로 복합뷰는 수정이 불가하다고 보는것도 갠춘.
+ 
+ UPDATE VW_SEHA
+   SET 학생이름 = '서진수1'
+ WHERE 학생이름 = '서진수'; -- 키-보존된것이 아닌 테이블로 대으안 열을 수정할 수 없습니다. 복합뷰의 수정은 여러 컬럼에 대응관계를 같는 컬럼일 경우 수정이 불가능하다. 싱글뷰만 가능!! 그냥 대체적으로 복합뷰는 수정이 불가하다고 보는것도 갠춘.
+ 
+
+-- 시퀀스 : 연속적인 숫자를 자동으로 부여해주는 채번 오브젝트
+-- 1. 시퀀스 생성
+CREATE SEQUENCE SEQ_JUMUN_NO
+INCREMENT BY 1
+START WITH 1000
+MAXVALUE 1010
+MINVALUE 1000
+CYCLE;
+
+CREATE SEQUENCE SEQ_JUMUN_NO3
+INCREMENT BY 1
+START WITH 1000
+MAXVALUE 1010
+MINVALUE 1000
+CYCLE;
+
+-- 2. 시퀀스를 사용한 번호의 부여
+CREATE TABLE JUMUN_TEST
+(NO NUMBER,
+ MANE VARCHAR2(10));
+ 
+INSERT INTO JUMUN_TEST VALUES (SEQ_JUMUN_NO.NEXTVAL, 'A');
+INSERT INTO JUMUN_TEST VALUES (SEQ_JUMUN_NO.NEXTVAL, 'B');
+SELECT * FROM JUMUN_TEST; -- 1001, 1002
+ROLLBACK; -- 이전 주문번호 삭제. 롤백해도 시퀀스는 돌아가지 않는다.
+INSERT INTO JUMUN_TEST VALUES (SEQ_JUMUN_NO.NEXTVAL, 'C'); 
+SELECT * FROM JUMUN_TEST; -- 1003 : 한번 늘어난 시퀀스는 다시 되돌릴 수 없다. 다시 처음부터 하고 싶다면 삭제하고 다시 작성해야 한다.
+
+INSERT INTO JUMUN_TEST VALUES (SEQ_JUMUN_NO3.NEXTVAL, 'A');
+SELECT * FROM JUMUN_TEST; -- 1000번 시작. 이유 : 11G의 기능중 하나이고 어려움.. 걍 넘어가.. 
+
+-- 시퀀스 현재 번호, 다음 번호 조회
+SELECT SEQ_JUMUN_NO2.CURRVAL FROM DUAL;  -- 현재까지 할당된 번호 : 보통 다음 시퀀스 물어볼때 이걸로 조회해야 함!!
+SELECT SEQ_JUMUN_NO3.NEXTVAL FROM DUAL;  -- 다음 번호(실제 증가 발생하므로 주의!)
+
+-- 시퀀스 생성 여부 확인
+SELECT *
+  FROM USER_SEQUENCES;
+
+
+-- 권한
+--1. 권한의 종류
+--1) system previlege : 특정 대상이 아닌 작업이 가능한 명령어 단위 부여되는 권한
+-- ex) create session, create table, create index, drop index, alter table
+
+--2) object privilege : 특정 대상(주로 테이블)에 부여되는 권한
+-- ex) select, update, delete, merge on table_name
+ 
+--2. 권한의 부여
+grant 권한/롤 to 유저명 [with grant option];
+
+--3. 권한의 회수
+revoke 권한 from 유저명;
+
+--4. role(권한의 묶음)을 통한 권한 부여(system 계정에서 수행)
+--role : 권한의 묶음
+create role test_role;
+grant select on scott.DEPARTMENT to test_role; -- 직접 권한 부여 : 즉시 효력발생
+grant select on scott.PROFESSOR to test_role;
+grant select on scott.BONUS to test_role;
+
+grant test_role to kic; -- role 을 통한 권한 부여 : 재접속 후 효력발생
+                        -- dba가 대표적인 role이다.
+
+
+
+-- system 계정에서 수행
+create user kic identified by oracle;
+grant create session to kic; -- create session : 오브젝트와 관련된 것은 아님. 접속을 맺을 수 있는 권한. 
+                             -- on 의 유무. select, update, delete, merge on table_name 권한 부여. 오브젝트 권한 부여
+
+-- system 계정에서 수행
+grant select on scott.student to hr;
+grant select on scott.EXAM_01 to hr with grant option; -- with grant option : 해당 권한에 대해 공유권한까지 부여함. 내가 받은 권한을 다른 사람에게 전달할 수 있게 해주는 권한.
+
+
+; grant select on 이므로 select 권한만 가능. 만약 update권한까지 주고 싶다면, grant select, update on 이렇게 하믄 댐.;
+
+-- hr 계정에서 수행
+grant select on scott.STUDENT to kic; -- 에러 발생
+grant select on scott.EXAM_01 to kic; -- 위에서 with grant option 권한을 부여 받아서 수행가능.
+
+-- system 계정에서 수행
+revoke select on scott.EXAM_01 from hr; -- with grant option 권한 회수. 중간자가 부여한 모든 유저들에 대한 with grant option 권한이 동시에 회수.
+
+-- kic 계정에서 수행
+select * from EXAM_01; -- 에러 발생(테이블 권한 없음). 중간자가 부여한 모든 유저들에 대한 with grant option 권한이 동시에 회수.

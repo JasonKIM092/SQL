@@ -1,0 +1,670 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-08-23 17:40
+[WORKSPACE]
+COUNT=5
+NAME=SQL1
+STMT=141
+--f5 : 전체 실행
+--ctrl + enter : 명령어 단위 실행
+--ctrl + m : 현재 커서부터 끝까지 실행
+
+--ctrl + - : 선택된 라인 주석처리
+--ctrl + shift + - : 선택된 라인 주석해제
+
+--ctrl + u : 소문자 치환
+--ctrl + shift + u : 대문자 치환
+
+--ctrl + t : 탭 추가
+--ctrl + o : 파일 불러오기
+
+--ctrl + n : new session
+
+-- 20190822 연습문제
+-- 문제1)
+desc emp;
+select * from emp;
+select empno, ename,
+       lower(job),
+       upper(job),
+       initcap(job)
+  from emp;
+        
+-- 문제2)
+select empno, ename, job
+  from EMP
+ where substr(ENAME, 1, 1) > 'K';
+
+-- 문제3)
+select ename, job
+from emp
+where length(ename) >= 6;
+
+-- 문제4)
+select ename, instr(ename,'L',1,1)
+from EMP;
+
+-- 연습문제
+-- 1) emp테이블에서 커미션(comm)을 받지 않는 사원의 급여를 10% 인상하여 표시하되,
+-- 다음의 형식으로 출력하여라.
+-- The salary of SMITH after a 10% raise is 880
+select * from emp;
+select 'The salary of ' || ENAME || ' after a 10% raise is ' || SAL*1.1
+ from emp;
+ 
+ -- 답
+ select 'The salary of '||ENAME||' after a 10% raise is '||SAL*1.1
+   from EMP
+  where comm is NULL
+     or comm = 0;
+
+
+-- 2) student 테이블에서 지역번호와 국번을 각각 출력하여라. ^
+select * from student;
+desc student;
+select tel, substr(TEL,1)
+from student;
+
+-- 답
+select name, tel, substr(tel,1,3),
+       instr(TEL,')') AS ")의 위치", 
+       substr(tel,
+                1,
+                instr(TEL,')')-1) AS 지역번호, -- 위치값 지정
+       substr(tel,
+              instr(TEL,')')+1),
+       instr(TEL,'-') AS "-의 위치",
+       instr(tel,'-') - instr(tel,')') - 1 AS 추출개수,
+       substr(tel,
+              instr(tel,')') +1,
+              instr(tel,'-') - instr(tel,')')-1) AS 국번
+  from student;
+  
+ -- 정리 
+  select name, tel,  
+       substr(tel,
+                1,
+                instr(TEL,')')-1) AS 지역번호, -- 위치값 지정
+       substr(tel,
+              instr(tel,')') +1,
+              instr(tel,'-') - instr(tel,')')-1) AS 국번
+  from student;
+  
+  055)381-2158      4      8      8-4-1
+  02)6255-9875      3      8      
+  02)312-9838       3      7      
+;
+
+-- 3) student 테이블을 사용하여 주민번호, 생년월일 각각을 사용하여 각 학생의 태어난 날의 요일을 출력하세요.
+select to_char(to_date('751023','RRMMDD'), 'RRRRMMDD') from dual; -- 'YYMMDD'로 하면 2075로 인식되므로 1975로 인식하려면 'RRMMDD'로 표시해야한다!!
+
+select name, JUMIN, BIRTHDAY,
+       to_char(to_date(substr(JUMIN,1,6),'RRMMDD'), 'DAY') AS 요일
+from student;
+
+select name,JUMIN, BIRTHDAY,
+       to_char(BIRTHDAY, 'DAY') AS 요일
+  from student;
+  
+-- 답
+select JUMIN, substr(JUMIN,1,6),
+       to_date(substr(JUMIN,1,6)) AS "주민번호 앞자리",
+       to_char(to_date(substr(JUMIN,1,6),'RRMMDD'), 'DAY') AS "주민번호 요일",
+       to_char(BIRTHDAY, 'DAY') AS "생년월일 요일"
+  from student;
+       
+
+-- 4) student 테이블에서 성이 'ㅅ'인 학생의 학번, 이름, 학년을 출력하여라. ^
+select STUDNO, NAME, GRADE
+  from student
+  where instr (name, 'ㅅ');
+  
+  --답
+  select * from student;
+  select studno, name, grade, substr(name,1,1) AS "LAST_NAME"  -- '사'보다 크고 '아'보다 작아야 한다. 문자에도 대소 크기가 있다는 점!!
+    from student
+   where substr(name,1,1) >= '사'
+     and substr(name,1,1) < '아';
+
+-- 5) EMPLOYEES 테이블에서 대소를 구분하지 않고, email에 last_name이 포함되어 있지 않은 사람의 EMPLOYY_ID. FIRST_NAME, EMAIL을 출력하여라. ^
+-- (EMPLOYEES 테이블은 hr 계정에서 조회 가능)
+select * from EMPLOYEES;
+select EMPLOYEE_ID, FIRST_NAME, EMAIL
+from EMPLOYEES
+where LAST_NAME is NULL;
+--답 1)
+select *
+  from EMPLOYEES
+ where  instr(EMAIL, upper(LAST_NAME)) = 0;
+  
+select instr('DGRANT', upper('Grant')) from dual; -- 포함여부 확인방법. 포함이 되어 있으면 0이 아닌 숫자를 출력하고, 포함되어 있지 않으면 0을 출력!!
+select instr('DOCONNEL', upper('OConnell')) from dual;
+
+-- 답 2) like 연산자 사용
+select *
+  from EMPLOYEES
+ where  EMAIL not like '%'||upper(LAST_NAME)||'%'; -- upper는 함수인데 함수를 홑따옴표에 포함시킬수 없으므로 각각 양 사이드에 홑따옴표를 붙여주고 하나의 문자로 결합이 되어야 하므로 연결연산자(||)로 이어준다.
+
+
+VAR=0
+NAME=SQL4
+STMT=29
+-- 날짜에 대한 비교
+select * -- 날짜와 문자의 비교는 기본적으로는 불가
+  from emp
+ where HIREDATE = '1981/02/22 00:00:00'; -- 조회되지 않는 이유 : 각각 날짜 칼럼과 문자형태라서 타입이 달라서.. 
+ 
+select * -- 년월일 형식의 문자는 자동 파싱이 가능하므로 수행됨. 하지만 '1981/02/22'의 날짜 처리를 권함(to_date사용)
+  from emp
+ where HIREDATE = '1981/02/22'; -- 이건 조회가 되는 이유 : 기본적으로 오라클 자동파싱 기능에서는 날짜는 년월일까지만 된다고 한다. 시분초까지는 안됨. 자동파싱기능은 사실상 없다고 여기고 공부하기. to_date기능을 활용하는 것을 습관들이기
+ 
+ 
+--1) 날짜타입을 문자로 변경 후 비교
+select *
+  from emp
+ where to_char(HIREDATE, 'YYYY/MM/DD HH24:MI:SS') = '1981/02/22 00:00:00'; 
+ 
+--2) 문자를 날짜타입으로 변경 후 비교
+select *
+  from emp
+ where HIREDATE = to_date('1981/02/22 00:00:00', 'YYYY/MM/DD HH24:MI:SS'); -- 왠만하면 추천. 함수는 왠만하면 상수에다가 씌우도록!! 컬럼에다가 씌우면 성능상 안좋다고 함!!
+ 
+select *
+  from EMP
+ where sal*1.1 >= 3000; -- 성능고려 안한 식.
+ 
+select *
+  from EMP
+ where sal >= 3000/1.1; -- 성능을 고려한 식.
+ 
+
+VAR=0
+NAME=SQL5
+STMT=345
+-- 문자함수 
+--1) initcap, lower, upper : 문자의 대소치환
+select ename,
+       initcap(ename),  -- 첫 글자만 대문자로
+       lower(ename),    -- 소문자
+       upper(ename)     -- 대문자
+  from emp;
+
+select *
+  from EMP
+ where lower(ename) = 'allen';
+
+--2) length, lengthb : 문자열의 길이와 바이트수 출력
+select name, length(name), lengthb(name)
+  from student;
+
+--3) substr(추출대상,시작위치, [개수]) : 문자열 추출 함수
+select substr('abcdefg',2,3), 
+       substr('abcdefg',-5,2)  -- 위치값은 음수가 될 수 있고 이때 추출 순서는 정방향
+  from dual;  --dummy table 
+
+--연습문제1) STUDENT테이블에서 여학생에 대한 정보만 출력
+select *
+  from student
+ where substr(JUMIN,7,1) = '2';
+
+--연습문제2) STUDENT테이블에서 각 학생의 전화번호 뒤 4자리 추출
+select tel, substr(tel,-4) 
+  from student;
+
+--4) instr : 찾고자 하는 문자열의 위치를 리턴해주는 함수
+--instr(원본문자열, 찾을문자열, 시작위치, 발견횟수)
+select instr('abcabcda','a',3,1)
+  from dual;
+
+select instr('abcabcda','a',-3,2)  -- 1 리턴, 스캔방향 역방향
+       instr('abcabcda','a',-3,3)  -- 찾고자 하는 문자열이 없는 경우는 0을 리턴
+  from dual;
+
+-- 5) pad 함수 : 문자열 삽입 함수 
+-- lpad(원본문자열, 삽입된 후의 총사이즈(바이트), 삽입문자열) : 원본문자열의 왼쪽에 지정 문자 삽입
+-- rpad(원본문자열, 삽입된 후의 총사이즈(바이트), 삽입문자열) : 원본문자열의 오른쪽에 지정 문자 삽입
+-- pad라는 함수, 양쪽에 동시에 삽입하는 함수는 없다
+
+select lpad('abcd',10,'a'), -- aaaaaaabcd
+       lpad('abcd',10), --      abcd
+       rpad('abcd',10,'a'), -- abcdaaaaaa
+       lpad('abcd',10,'') -- NULL
+  from dual;
+
+select lpad('ㄱㄴㄷ',10,'ㅁ'), -- 한글의 경우는 한 자당 2바이트!! 가나다, ㄱㄴㄷ 똑같더라...ㅁㅁㄱㄴㄷ
+       lpad('가나다',10,'ㅁ'), --ㅁㅁ가나다
+       rpad('가나다',10,'a')  -- 가나다aaaa, 영어는 한 자당 1바이트!!
+  from dual;
+
+
+-- 6) trim 함수 : 문자열 제거 함수
+-- ltrim(원본문자열,[삭제문자열]) : 원본문자열에서 왼쪽부터 지정 문자 삭제, 삭제문자열을 기록안할 경우 공백삭제
+-- rtrim(원본문자열,[삭제문자열]) : 원본문자열에서 오른쪽부터 지정 문자 삭제, 삭제문자열을 기록안할 경우 공백삭제
+-- trim(원본문자열) : 양옆 공백만 삭제 가능
+
+select ltrim('abcabca', 'a'), --bcabca : 중간에 있는 a가 제거가 안된이유 : 제거를 하다가 제거를 할 필요가 없는 대상을 만나는 순간 제거기능이 멈춘다. 만약 aaaaaaaa만 있으면 다 삭제됨. 따라서 중간에 있는 문자는 삭제가 불가한다.
+       ltrim('               ab  c  a   bca'), --ab  c  a   bca
+       rtrim('abcabca', 'a'), --abcabc
+       trim('  abc abca  ') --abc abca : 공백도 중간에 있는 공백도 ltrim, rtrim, trim 모두 다 제거가 안된다!!
+  from dual;
+
+-- 데이터에 공백이 삽입되어 있는 경우 검색이 되지 않을 수 있음(trim사용 필요)
+create table trim_test(col1 varchar2(10), col2 varchar2(10));
+insert into trim_test values('abcd','abcd ');
+commit;
+
+select *
+  from trim_test
+ where col1=col2;  -- 조회되지 않음
+ 
+select col1, length(col1), col2, length(col2)
+  from trim_test
+ where col1 = trim(col2);  -- 조회 됨
+ 
+ 
+select *
+  from trim_test
+ where trim(col2) = 'abcd';
+ 
+
+-- 7) replace : 단어 단위 치환 함수, 삭제 기능 있음
+-- replace(원본문자열, 찾을문자열, 바꿀문자열)
+select replace('abcdba', 'ab', 'AB'),  --ABcdba : '단어'치환
+       replace('abcdba', 'abc', 'AB'), --ABdba : '단어'치환
+       ltrim('abcdba', 'a'), --bcdba : trim 삭제기능 참고
+       replace('abcdba', 'a', ''), --bcdb : 원하는 모든 단어, 글자 삭제 가능
+       replace('abcdba', 'ab', ''), --cdba : 단어삭제
+       replace(' a bc d b a ', ' ', '') --abcdba : 공백삭제
+  from dual; 
+
+select replace('abcdba', 'ab', ''), --cdba : 삭제기능(''), 문자2칸에 ''삽입
+       replace('abcdba', 'ab', ' '), --' cdba' : 공백기능(' '), 문자2칸에 ' '삽입
+       replace('abcdba', 'ab'), --cdba : 삭제기능. 문자2칸 비우기.
+  from dual; 
+
+
+
+select to_number(replace('9,999',',','')) + 1
+  from dual;
+
+
+-- 8) translate : 글자 단위 치환 함수, 삭제 기능 있음
+-- translate(원본문자열, 찾을문자열, 바꿀문자열)
+select translate('abcdba', 'ab', 'AB'), --ABcdBA : '문자'치환
+       translate('abcdba', 'abc', 'AB'), --ABdBA : 매칭되지 않는 글자는 삭제. 두번째 인자의 c는 매칭되는 치환 문자가 없어 삭제됨
+       translate('abcdba', 'ab', 'ABC'), --ABcdBA : C는 무시된다. 무조건 1대1대응. 세번째 인자의 C는 무시됨
+       translate('abcdba', 'ab', ''), --NULL
+       translate('abcdba', 'ab', ' ') --' cd ' : 공백이 생긴다.
+  from dual; 
+  
+  
+select replace('abccdba', 'abc', 'AB'), --ABcdba
+       translate('abccdeefba', 'abc', 'AB') --ABdeefBA
+  from dual;
+  
+select ID, translate(ID,'-',''), -- NULL :  문자2칸 '' 삽입
+           translate(ID,'-',' '), -- '-'가 공백으로 바뀜 : 문자2칸 ' '삽입
+           translate(ID,'A-!@#$%','A'), -- 특수기호를 한번에 삭제하기 위한 방법, 바꿀문자열에는 아무문자나 들어가도 상관 없다.
+           translate(ID,'A-!@#$%',' '), -- 특수기호를 한번에 삭제하기 위한 방법, 바꿀문자열에는 아무문자나 들어가도 상관 없다.
+           translate(ID,'A-!@#$%','') -- NULL
+  from professor;
+  
+  
+  
+-- 예제1)
+select * from emp;
+
+select lpad(ENAME, 15, '*'), JOB,SAL
+ from emp;
+ 
+-- 예제2)
+select ENAME,DEPTNO, sal, lpad(SAL, 5, 0)
+  from emp;
+
+-- 예제3)
+select * from emp;
+select job, ltrim(JOB, 'A'),
+       sal, ltrim(SAL, 1)
+  from emp;
+  
+-- 예제4)
+select job, rtrim(JOB, 'T'),
+       sal, rtrim(SAL, 0)
+  from emp;
+  
+-- 예제5)
+select job,
+       replace(JOB, 'A', '$'),
+       translate(JOB, 'A', '$')
+  from emp;
+  
+
+-- 형 변환 함수
+--1. to_char : 문자가 아닌 데이터를 문자로 변환 시 사용, 리턴 데이터는 문자
+--1) 날짜 -> 문자
+select to_char('2020/01/03', 'DAY')  -- 에러 발생, 문자는 to_char의 인수로 사용 불가  
+  from dual;
+  
+select to_char(to_date('2020/01/03'), 'DAY')  -- 날짜로 변경 후 사용 가능
+  from dual;
+  
+
+  
+  -- 날짜 변경 함수(형변환함수) 사용 : to_char(날짜, 변경포맷)
+  -- 날짜의 언어를 변경하는 방법 : alter session set nls_date_language='american'; , alter session set nls_date_language='korean';
+alter session set nls_date_language='american';
+select sysdate, 
+       to_char(sysdate, 'YYYY') AS 년도,
+       to_char(sysdate, 'MM') AS 월,
+       to_char(sysdate, 'DD') AS 일,
+       to_char(sysdate, 'HH24') AS "시(24시기준)",
+       to_char(sysdate, 'MI') AS 분,
+       to_char(sysdate, 'SS') AS 초,
+       to_char(sysdate, 'Q') AS 분기,
+       to_char(sysdate, 'DAY') AS 요일,
+       to_char(sysdate, 'YEAR') AS "년도 영문 표기법",
+       to_char(sysdate, 'MON') AS 월, -- 둘다 '8월'으로 출력됨. 날짜를 표현하는 언어가 한글이라 그럼. alter session set nls_date_language='american'; 언어를 변경하는 명령을 주면 바뀐다. AUG
+       to_char(sysdate, 'MONTH') AS 월, -- 둘다 '8월'으로 출력됨. 날짜를 표현하는 언어가 한글이라 그럼. AUGUST 
+       to_char(sysdate, 'month') AS 월, -- august, month가 소문자라 그럼. 영문표현은 대소 구분함
+       to_char(sysdate, 'Month') AS 월, --August   
+       to_char(sysdate, 'DDTH') AS 일, -- '일'의 서수식 표현. 영문이던 한글이던 상관없이 서수로 나옴
+       to_char(sysdate, 'DDSPTH') AS 일 -- 영문 '일'의 서수식표현. 영문으로만 표현가능함. SO, 날짜의 언어가 한글일때도 가능.
+  from dual;
+  
+  
+select to_char(sysdate, 'YYYY-MM-DD'), -- 특수기호 가능
+       to_char(sysdate, 'YYYY:MM:DD'), -- 특수기호 가능
+       to_char(sysdate, 'YYYY')||'년 '
+       ||to_char(sysdate, 'MM')||'월 '
+       ||to_char(sysdate, 'DD')||'일', -- 한글로 표현 방식 1
+       to_char(sysdate, 'YYYY"년 "MM"월 "DD"일"') -- 한글로 표현 방식 2
+  from dual;
+  
+select to_char(sysdate, 'YYYY:MM:DD')
+  from dual;
+
+
+--2) 숫자 -> 문자
+select to_char('9999','9,999') -- 첫번째 칸에 문자 오면 안됨. 원칙상 에러이나 오라클에서 자동으로 to_number를 써줌,,,
+  from dual;
+
+select to_char(to_number('9999'),'9,999')
+  from dual;
+  
+select to_char(to_number('1111111119999'),'9,999') -- 자리수가 안맞아서 오류남.. 자리수 맞춰주기.. 자리수 부족하지 않게...
+  from dual;
+select to_char(to_number('1111111119999'),'9,999,999,999,999,999')
+  from dual;
+
+select to_char(to_number('1111111119999'),'9,999,999,999,999') +1 -- 문자+숫자 연산 불가능..
+  from dual;
+
+select to_char(1111,'$9,999')
+  from dual;
+
+select to_char(1111,'9,999\') -- to-char안에는 원(\)기호가 없어서 다른 방식으로 표현해야 함
+  from dual;
+select to_char(1111,'9,999')||'\' -- 이런식으로 원(\)기호 넣기
+  from dual;
+  
+select to_char(1111,'99999999'), to_char(1111,'0999999')
+  from dual;
+  
+select to_char(1111,'999999.99'), to_char(1111,'09999.99')
+  from dual;
+
+
+--2. to_date : 날짜가 아닌 데이터를 날짜로 파싱(해석)시 사용
+--to_date(날짜로 표현 가능한 문자 또는 숫자, format)
+
+--1) 문자 -> 날짜
+select to_date('2019/01/03')
+  from dual;
+  
+select to_date('01/03/19'),             -- 0001/03/19 00:00:00
+       to_date('01/03/19', 'MM/DD/YY')  -- 2019/01/03 00:00:00
+  from dual;
+
+--2) 숫자 -> 날짜
+select to_date(20190103)
+  from dual;
+ 
+--연습문제1) emp 테이블에서 각 사원의 입사일로 부터 100이 지난 날짜의 요일을 출력 
+desc EMP;
+
+select ename, hiredate, to_char(hiredate + 100, 'DAY')
+  from emp;
+
+--연습문제2) emp 테이블에서 1981년에 입사한 직원의 이름, 입사일, sal 출력
+select ename, hiredate, sal
+  from emp
+ where to_char(hiredate,'YYYY') = '1981';
+
+alter session set nls_date_format='YYYYMMDD';
+
+select ename, hiredate, sal
+  from emp
+ where substr(hiredate,1,4) = '1981';
+
+--연습문제3) 2019/08/21로 부터 560시간 이후의 날짜의 요일 출력(평일, 주말 상관X)
+select to_char(to_date('2019/08/21', 'YYYY/MM/DD') + 560/24, 'DAY')
+  from dual;
+
+--3. to_number : 숫자로 변경 가능한 문자를 숫자로 변경하는 함수
+select to_number('9') 
+  from dual;
+
+select '9' + 1  -- to_number('9')  + 1 : 묵시적 형변환
+  from dual;
+  
+-- 묵시적 형 변환 :  사용자의 의도와는 다르게 함수가 사용되면서 형이 변환되는 경우
+select *
+  from STUDENT
+ where substr(jumin,7,1) = 1; -- 오류.. jumin은 문자칼럼인데 숫자(1)로 표현
+ 
+select *
+  from STUDENT
+ where to_number(substr(jumin,7,1)) = 1; 
+ 
+select *
+  from STUDENT
+ where substr(jumin,7,1) = '1'; 
+ 
+ 
+--실습문제1)
+select *
+  from emp;
+desc emp;
+  
+select ename, hiredate,
+       to_char(hiredate, 'DD MONTH YYYY'),
+       to_char(hiredate, 'YYYY"년 "MM"월 " DD"일"')
+  from emp
+ where DEPTNO = 10;
+ 
+-- 답
+select ename, hiredate, 
+       to_char(hiredate, 'DD MONTH YYYY'),
+       to_char(hiredate, 'YYYY"년 "MM"월 "DD"일"')
+  from EMP
+ where deptno=10;
+  
+--2)
+select * 
+  from EMP
+ where DEPTNO = 20;
+
+select ename, sal,
+       to_char(SAL, '$9,999,999') AS "salary"
+  from EMP
+ where DEPTNO = 20;
+ 
+select ename, sal,
+       trim(to_char(SAL, '$9,999,999')) AS "salary" -- 불필요한 공백 제거
+  from EMP
+ where DEPTNO = 20;
+
+--3) 
+alter session set nls_date_language=american;
+select *
+  from emp;
+select ename, job, 
+       to_char(hiredate, 'month DD, YYYY')
+  from EMP
+ where to_char(hiredate, 'YYYY/MM/DD') = '1981/02/22';
+ 
+--답
+select *
+  from EMP
+ where to_char(hiredate, 'month DD, YYYY') = 'february 22, 1981';
+ 
+select to_char(hiredate, 'month DD, YYYY') -- february  22, 1981 : 조회가 안되는 이유는 공백의 차이
+  from EMP;
+ where to_char(hiredate, 'month DD, YYYY') = 'february 22, 1981';
+ 
+ 
+select *
+  from EMP
+ where hiredate = to_date('february 22, 1981', 'month DD, YYYY'); -- 최종 답안. where절을 변경하지 말고, = 절을 변경하는 습관을 들이기!!
+VAR=1
+:00=0,
+NAME=SQL6
+STMT=65
+-- 숫자 함수
+-- 1) round, trunc
+select round(1234.5678,2), --1234.57  round(1234.5678,2) : 소숫점 셋째자리에서 반올림. 즉 둘째자리까지 표현
+       round(1234.5678,-2), --1200
+       round(1256.5678,-2), --1300
+       round(1256.5678), --1257
+       trunc(1234.5678,2),  --1234.56  trunc(1234.5678,2) : 소숫점 셋째자리에서 버림. 즉 둘째자리까지 표현
+       trunc(1234.5678,-2),--1200
+       trunc(1256.5678,-2),--1200
+       trunc(1234.5678) --1234
+  from dual;
+  
+  
+-- 2) sign : 양수, 음수를 판별하는 함수
+sal > 1000 => A;
+sal > 2000 => B;
+
+select sign(1100 - 1000) -- 1출력
+  from dual;
+  
+-- 날짜 함수
+-- 날짜 끼리의 연산 : 날짜 - 날짜 = 일수. 날짜 - 날짜는 사이 "일"수 출력 (단위 : 일)
+select ename, trunc(sysdate - hiredate) AS 근속일수
+  from emp;
+  
+-- 1) months_between(a,b)
+select ename, 
+       trunc(sysdate - hiredate) AS 근속일수,
+       trunc(months_between(sysdate,hiredate)) AS "근무 개월수", -- "년"과 관련된 함수는 없으므로, 근속일수/365로 해주거나 근무개월수/12로 해준다.
+       trunc((sysdate - hiredate)/365) AS 근속년수,
+       trunc(months_between(sysdate,hiredate)/12) AS 근속년수
+  from emp;
+
+-- 2) add_months(날짜, 정수) : n개월 후 날짜
+select add_months(sysdate,3), sysdate + 3*30
+  from dual;
+  
+-- 3) next_day(날짜, 요일) : 다음에 오는 특정요일의 날짜 출력
+-- 요일인자는 한글날짜일 때는 월,화,수로 영문 날짜인 경우는 영문 축약형으로
+-- 아니면 숫자로 전달 가능(1:일요일, 2:월요일, ...)
+
+select next_day(sysdate, 'FRI'),
+       next_day(next_day(sysdate, 'FRI'),'FRI'), -- 다다음주를 표현할 때.
+       next_day(sysdate,6)
+  from dual;
+
+alter session set nls_date_language='korean';
+alter session set nls_date_language='american';
+
+-- 4) last_day(날짜) : 해당 날짜가 포함된 달의 마지막 날짜 츨력
+select last_day(sysdate)
+  from dual;
+  
+-- 5) round, trunc : 날짜의 반올림, 버림 함수
+select sysdate,                 -- 2019/08/23 15:46:15
+       round(sysdate, 'month'), -- 2019/09/01 00:00:00 : 23일에서 반올림 된것. 즉 month는 month를 맞추라는 것, 즉 "일"에서 반올림
+       round(sysdate, 'year'),   -- 2020/01/01 00:00:00 : 월에서 반올림을 시도하여 year을 맞춰준 것.
+       round(sysdate), --2019/08/24 00:00:00 : default 단위가 'dd' 즉 '일'이다.
+       round(sysdate, 'dd') -- 2019/08/24 00:00:00
+  from dual;
+
+
+-- 일반함수
+
+
+VAR=0
+NAME=SQL8
+STMT=67
+--1. professor 테이블에서 각 교수의 이메일 아이디를 출력하되,
+--다음의 특수기호를 제거한 형태로 출력하여라.
+select NAME,ID,EMAIL,
+       translate(EMAIL,'1!@#$%^&*_+-().','1') AS 특수기호생략
+  from professor;
+
+
+--2. student 테이블에서 전화번호 형식을 다음과 같이 변경하세요.
+--051)426-1700 => 051 426 1700
+select NAME,TEL,
+       translate(TEL,')-','  ') AS 변경 -- 두칸띄기
+  from student;
+
+--3. EMP 테이블을 이용하여 사원이름, 입사일 및 급여검토일을 표시합니다. ^
+-- 급여검토일은 여섯달 근무후 해당되는 첫번째 월요일입니다.
+-- 날짜는 "Sunday the Seventh of September, 1981" 형식으로 표시하도록 한다.
+-- 열 이름은 check로 한다.
+
+
+--4. student 테이블에서 jumin 컬럼을 사용하여 생년월일이 다음 사이인 학생의 정보를 출력하세요.
+--(19760205 ~ 19760924)
+desc emp; --CHAR(13)
+select name, jumin
+  from student
+ where to_char(to_date(substr(JUMIN,1,6),'RRMMDD'),'RRRRMMDD')
+ between '19760205' and '19760924';
+
+--5. emp 테이블을 이용하여 현재까지 근무일수를 xx년 xx개월 xx일 형태로 출력하세요.^
+select ENAME,HIREDATE,
+       trunc(sysdate, 'YYYY') - trunc(HIREDATE, 'YYYY') AS 년,
+       trunc((sysdate-HIREDATE)/365) AS 년,
+       trunc(((trunc(sysdate-HIREDATE)/365) 
+       - trunc((sysdate-HIREDATE)/365))*12) AS 개월,
+       
+       last_day(HIREDATE) - HIREDATE AS 일
+  from emp;
+
+select ename, trunc(sysdate-HIREDATE) from emp;
+
+
+-- 실습문제
+--1)
+select ename,
+       trunc(sysdate - hiredate) AS 근무일수,
+       trunc(months_between(sysdate,hiredate)/4) AS 근무주 
+  from emp
+ order by trunc(sysdate - hiredate) desc,
+          trunc(months_between(sysdate,hiredate)/4) desc;
+ 
+--2)
+select ENAME, HIREDATE,
+       trunc(months_between(sysdate,HIREDATE)) AS 근무월수
+  from emp
+ where DEPTNO=10;
+ 
+--3)
+select ENAME,HIREDATE
+  from emp;
+select ename, hiredate,
+       last_day(HIREDATE)-HIREDATE AS "입사한 달의 남은 근무 일수"
+  from emp;
+  
+--4)
+select ename, hiredate,
+       next_day(HIREDATE,6) AS "돌아오는 금요일"
+  from EMP
+ where deptno = 10;
+VAR=0

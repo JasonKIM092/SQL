@@ -1,0 +1,467 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-09-02 17:51
+[WORKSPACE]
+COUNT=3
+NAME=SQL1
+STMT=141
+--문제1) emp테이블에서 직업별 최대연봉을 구하고, 직업별 최대연봉을 갖는
+--직원의 이름, 직업, 연봉을 구하세요.
+--(다중컬럼, 인라인뷰, 상호연관 서브쿼리)
+-- 다중컬럼
+select JOB, max(SAL)
+  from EMP
+ group by job;
+
+select ENAME,JOB,SAL
+  from emp
+ where(JOB,SAL) in (select JOB, max(SAL)
+                      from EMP
+                     group by job);
+                     
+-- 답
+select ENAME,JOB,SAL
+  from emp
+ where(JOB,SAL) in (select JOB, max(SAL)
+                      from EMP
+                     group by job);
+
+                     
+-- 인라인뷰
+select e.ENAME, e.JOB, e.SAL
+  from emp e, (select JOB, max(SAL) max_sal
+                 from EMP
+                group by job) i
+ where e.job = i.job
+   and e.sal = i.max_sal;
+   
+-- 답
+select e.ENAME, e.JOB, e.SAL
+  from emp e, (select JOB, max(SAL) max_sal
+                 from EMP
+                group by job) i
+ where e.job = i.job
+   and e.sal = i.max_sal;
+   
+-- 상호연관
+select e1.ENAME, e1.JOB, e1.SAL
+  from emp e1
+ where SAL = (select max(SAL)
+                from EMP e2
+               where e1.job = e2.job);
+               
+-- 답
+select e1.ENAME, e1.JOB, e1.SAL
+  from emp e1
+ where SAL = (select max(SAL)
+                from EMP e2
+               where e1.job = e2.job);
+
+
+--문제2) student 테이블과 exam_01 테이블을 사용하여 각 학생의 시험성적을 이름과 함께 출력하여라
+--(스칼라 서브쿼리)
+select s.NAME,
+       (select e.TOTAL from EXAM_01 e where s.STUDNO=e.STUDNO) 시험성적
+  from student s;
+
+-- 답
+select s.NAME, e.TOTAL 시험성적
+  from STUDENT s, EXAM_01 e
+ where s.STUDNO = e.STUDNO; --조인
+ 
+select s.NAME,
+       (select e.TOTAL from EXAM_01 e where s.STUDNO=e.STUDNO) 시험성적
+  from student s; -- 스칼라 서브쿼리
+ 
+ 
+--문제3) professor 테이블에서 입사년도(1980, 1990, 2000년대)별 평균연봉보다 높은 연봉을 받는
+--교수의 이름, 연봉, 지도학생 수를 출력하여라.
+-- (인라인뷰, 상호연관)
+-- 인라인뷰
+select p.NAME, p.PAY, count(s.STUDNO) 학생수, trunc(to_char(p.HIREDATE,'YYYY'),-1) 입사년도
+  from PROFESSOR p, student s, (select trunc(to_char(HIREDATE,'YYYY'),-1) hire, avg(PAY) avg_p
+                                  from PROFESSOR
+                                 group by trunc(to_char(HIREDATE,'YYYY'),-1)) i
+   where p.PROFNO = s.PROFNO(+)
+     and trunc(to_char(p.HIREDATE,'YYYY'),-1) = i.hire
+     and p.pay > i.avg_p
+   group by p.PROFNO, p.NAME, p.PAY, trunc(to_char(p.HIREDATE,'YYYY'),-1)
+   order by p.name;
+   
+-- 답
+-- s(+) - p - i
+select p.NAME, p.PAY, count(s.STUDNO) 학생수
+  from PROFESSOR p, (select trunc(to_char(hiredate,'YYYY'),-1) yyyy,
+                            avg(pay) avg_pay
+                       from PROFESSOR
+                      group by trunc(to_char(hiredate,'YYYY'),-1)) i, STUDENT s
+ where trunc(to_char(p.hiredate,'YYYY'),-1) = i.yyyy
+   and p.pay > i.avg_pay
+   and p.PROFNO = s.PROFNO(+)
+ group by p.PROFNO, p.NAME, p.PAY -- profno를 쓰는 이유 : 이름과 페이가 둘다 같은 사람이 같은 그룹으로 묶이는 것을 방지하기 위하여.
+;
+
+-- 상호연관
+select p1.NAME, p1.PAY, count(s.STUDNO) 학생수, trunc(to_char(p1.HIREDATE,'YYYY'),-1) 입사년도
+  from PROFESSOR p1, student s 
+   where p1.PROFNO = s.PROFNO(+)
+     and p1.pay > (select avg(PAY)
+                     from PROFESSOR p2
+                    where trunc(to_char(p1.HIREDATE,'YYYY'),-1) = 
+                          trunc(to_char(p2.HIREDATE,'YYYY'),-1))
+   group by p1.PROFNO, p1.NAME, p1.PAY, trunc(to_char(p1.HIREDATE,'YYYY'),-1)
+   order by p1.name;
+   
+-- 답
+select p1.NAME, p1.PAY, count(s.STUDNO) 학생수
+  from PROFESSOR p1, STUDENT s
+ where pay > (select avg(pay)
+                from PROFESSOR p2
+               where trunc(to_char(p1.hiredate,'YYYY'),-1) = 
+                     trunc(to_char(p2.hiredate,'YYYY'), -1))
+  and p1.PROFNO = s.PROFNO(+)
+group by p1.PROFNO, p1.NAME, p1.PAY;
+
+--문제4) student, professor 테이블에서 같은지역, 같은 성별의 친구가 몇명인지 구하고,
+--그 학생의 담당 교수 이름도 함께 출력되도록 하여라.
+--단, 같은지역, 같은 성별에 본인은 포함될 수 없다.
+select s.NAME 학생이름, nvl2(p.NAME, p.NAME, 'NONE') 교수이름, i.학생수
+  from student s, professor p, (select substr(TEL,1,instr(TEL,')',1)-1) 지역, substr(JUMIN,7,1) 성별, count(studno)-1 학생수
+                                  from STUDENT
+                                 group by substr(TEL,1,instr(TEL,')',1)-1), substr(JUMIN,7,1)) i
+ where s.PROFNO = p.PROFNO(+)
+   and substr(s.TEL,1,instr(s.TEL,')',1)-1) = i.지역
+   and substr(s.JUMIN,7,1) = i.성별;
+   
+select substr(TEL,1,instr(TEL,')',1)-1) 지역, substr(JUMIN,7,1) 성별, count(studno)
+  from STUDENT
+ group by substr(TEL,1,instr(TEL,')',1)-1), substr(JUMIN,7,1);
+ 
+-- 답
+--p(+) - s1 - s2(+)
+select s1.NAME 학생이름, p.NAME 교수이름, count(s2.STUDNO) 친구수
+  from STUDENT s1, STUDENT s2, PROFESSOR p
+ where substr(s1.JUMIN,7,1) = substr(s2.JUMIN(+),7,1)  -- (+)기호는 컬럼 다음에 붙이는 것!!
+   and substr(s1.TEL,1,instr(s1.TEL,')')-1) = substr(s2.TEL(+),1,instr(s2.TEL(+),')')-1) -- s2.TEL이 두군데 있어서 둘다 붙여줘야 댐
+   and s1.STUDNO != s2.STUDNO(+)  -- 이것또한 s1과 s2의 관계이므로 (+)를 붙여준다.
+   and s1.PROFNO = p.PROFNO(+)
+ group by s1.STUDNO, s1.NAME, p.NAME;
+VAR=0
+NAME=SQL2
+STMT=233
+-- 스칼라 서브쿼리 : select절에 컬럼을 표현하기 위한 용도로 select를 다시 사용하는 것
+-- 단점) 조인의 대체 연산으로도 가능하나 각 행마다 조건이 반벅되므로 대용량 테이블,
+-- 표현하고자 하는 컬럼이 여러개일 경우 적절치 않다.
+
+-- 장점) 아우터 조인을 고려하지 않아도 모두 출력
+
+-- 예제) emp 테이블의 각 직원의 부서명을 출력
+-- 조인)
+select e.EMPNO, e.ENAME, d.DNAME 부서명
+  from emp e, dept d
+ where e.DEPTNO = d.DEPTNO;
+
+-- 스칼라 서브쿼리)
+select e.EMPNO, e.ENAME,
+       (select d.DNAME from dept d where e.DEPTNO = d.DEPTNO) 부서명
+  from emp e;
+  
+-- 연습문제) emp 테이블에서 각 직원의 이름과 상위관리자 이름을 출력
+-- 단, 상위관리자가 없는 경우도 출력
+-- 조인) 아우터 조인 정보가 따로 표시하지 않으면 출력이 안된다.
+select e1.ename 직원, e2.ename 상위관리자
+  from emp e1, emp e2
+ where e1.MGR = e2.EMPNO(+);
+
+-- 스칼라 서브쿼리) 아우터 조인을 따로 표시하지 않아도 아우터 조인 정보가 자동으로 출력이 된다. 
+--                  이유 :  메인쿼리의 where절에 제한조건이 없으므로 무조건 다 출력한다. (select e2.ENAME from emp e2 where e1.MGR = e2.EMPNO) 이부분이 NULL값이다.
+--                  (select e2.ENAME from emp e2 where e1.MGR = e2.EMPNO(+))  아우터 조인표시를 해도 파싱상 문제는 없지만 왠만하면 안쓰는 것이...
+select e1.ENAME 직원,
+       (select e2.ENAME from emp e2 where e1.MGR = e2.EMPNO) 상위관리자
+  from emp e1;
+  
+-- DEPARTMENT 테이블에서 각 학과의 이름과 상위학과 이름을 함께 출력하되
+-- 상위학과가 없는 경우는 그 학과명이 출력되도록 하여라(스칼라 서브쿼리)
+select d1.DNAME 학과명,
+       nvl((select d2.DNAME from DEPARTMENT d2 where d1.PART = d2.DEPTNO), d1.DNAME) 상위학과명    -- NULL값 처리할때, 컬럼안에 쓰는 것이 아니라 컬럼 밖에 써야한다. 서브쿼리 한개 자체가 하나의 컬럼이다.
+                                                                                                   -- (select nvl(d2.DNAME, d1.DNAME) from DEPARTMENT d2 where d1.PART = d2.DEPTNO(+)) 이렇게 쓰는게 아니라
+                                                                                                   -- nvl((select d2.DNAME from DEPARTMENT d2 where d1.PART = d2.DEPTNO), d1.DNAME) 이렇게 써야함
+  from department d1;
+  
+--조인)
+select d1.dname 학과명, nvl(d2.dname, d1.DNAME) 상위학과명
+  from DEPARTMENT d1, DEPARTMENT d2
+ where d1.PART = d2.DEPTNO(+);
+  
+select * from DEPARTMENT;
+
+---------------------------------------------------------------- 
+-- 참고) 테이블 복구 방법
+-- 1. EMP 테이블 DELETE로 삭제시 복구 방법
+DELETE FROM EMP; -- 전체 다시 삭제
+COMMIT;
+INSERT INTO EMP
+SELECT * FROM EMP AS OF TIMESTAMP(SYSTIMESTAMP - INTERVAL '3' HOUR);
+-- 20시간 이전 데이터로 다시 입력
+
+SELECT * FROM EMP;
+
+-- 2. EMP 테이블 DROP으로 삭제시 복구 방법
+CREATE TABLE EMP_BACKUP AS SELECT * FROM EMP;
+DROP TABLE EMP_BACKUP;
+
+SELECT * FROM USER_RECYCLEBIN;
+
+FLASHBACK TABLE "BIN$MX1bDu9VSzug76nubUvwNw==$0" TO BEFOREDROP;  --"BIN$MX1bDu9VSzug76nubUvwNw==$0" : OBJECT_NAME. SELECT * FROM USER_RECYCLEBIN;실행시 알 수 있음.
+
+SELECT * FROM EMP_BACKUP;
+--
+
+-- DML : 데이터 수정 언어(INSERT : 삽입, DELETE : 행단위 삭제, UPDATE : 수정, MERGE : 병합(INSERT, DELETE, UPDATE를 한번에 사용하는 명령어))
+-- 데이터 수정 후 저장여부 명령어(TCL) 필요(COMMIT : 저장하겠다, ROLLBACK : 저장하지 않고 전의 상태로 돌리겠다.)
+--
+-- DDL : 데이터 정의 언어(CREATE : 데이터구조생성, DROP : 구조삭제, ALTER : 구조적변경, TRUNCATE : 구조삭제)
+
+-- 1. INSERT : 데이터 행단위 삽입. 테이블에 행 삽입 시 사용.
+-- 1) 전체 컬럼 입력 시
+INSERT INTO 테이블명 VALUES(컬럼1입력값, 컬럼2입력값,...,);
+DESC EMP;
+INSERT INTO EMP VALUES(9998,'KIM JINMAN', 'MANAGER', 7901,
+                       TO_DATE('2019/09/02', 'YYYY/MM/DD'), 9000, 5000, 10); -- 데이터타입은 꼭 지키면서 삽입할 것!
+
+-- 2) 일부 컬럼 입력 시
+INSERT INTO 테이블명(선택컬럼1, 선택컬럼2,...) VALUES(선택컬럼1입력값, 선택컬럼2입력값,...,);
+
+연습문제) EMP 테이블에 새 직원의 정보를 사원번호(9000번대), 이름, 소속부서, SAL만
+입력하여 행 추가;
+INSERT INTO EMP(EMPNO,ENAME,DEPTNO,SAL) VALUES(9996, 'JASON KIM', 30, 7000);
+COMMIT;
+
+INSERT INTO EMP_GROUP VALUES(7370, SMITH, CLERK, 7902, TO_DATE('1981/12/17','YYYY/MM/DD'), 800, NULL, 20);
+DELETE FROM EMP_GROUP WHERE EMPNO=7370;
+ROLLBACK;
+
+                       
+SELECT * FROM EMP_GROUP;
+
+-- 3) 테이블의 행을 입력 시 
+INSERT INTO 테이블명
+SELECT ...;
+
+INSERT INTO EMP_GROUP
+SELECT * FROM EMP WHERE DEPTNO = 10;
+
+INSERT INTO EMP_GROUP
+SELECT EMPNO, ENAME, SAL FROM EMP WHERE DEPTNO = 10; -- 수행불가 : 값의 수가 충분하지 않습니다. 컬럼 갯수가 안맞음.
+
+INSERT INTO EMP_GROUP(EMPNO, ENAME, SAL)
+SELECT EMPNO, ENAME, SAL FROM EMP WHERE DEPTNO = 10; -- 컬럼을 선택하여 입력 시, 컬럼의 갯수, 데이터타입, 컬럼의 순서(의미)가 일치해야 한다.
+
+ROLLBACK;
+
+
+-- 2. DELETE : 행 단위 삭제, 조건 생략 시 전체 행 삭제 주의
+-- 삭제 기록을 남기는 방식의 삭제방법 => 느릴 수 있으나 잘못 삭제 된 데이터의 복원이 가능
+DELETE FROM 테이블명
+ WHERE ... ;
+ 
+DELETE FROM EMP
+ WHERE EMPNO = 9998;
+ 
+SAVEPOINT A; 
+
+-- SAVEPOINT A; 
+-- ROLLBACK A; -- 지점설정. 해당 지점을 설정 후, 후에 잘못 삭제하여 ROLLBACK A;를 수행할 경우, 다시 해당 지점으로 돌아오는 기능.
+
+DELETE FROM EMP;
+ROLLBACK A;
+ 
+COMMIT;
+ 
+DELETE FROM EMP; 
+ 
+ROLLBACK; -- 최종커밋 이후는 모두 롤백
+
+SELECT * FROM EMP;
+
+-- 연습문제) EMP_GROUP 테이블에서 ALLEN의 연봉보다 낮은 직원의 정보 삭제
+SELECT * FROM EMP_GROUP;
+DELETE FROM EMP_GROUP
+ WHERE SAL < (SELECT SAL
+                FROM EMP_GROUP
+               WHERE ENAME = 'ALLEN');
+               
+ROLLBACK;
+-- DELETE는 서브쿼리 사용 가능하지만, JOIN의 경우는 사용이 가능하지만 현업에서는 잘 사용하지는 않는다. FROM절에는 2개이상 테이블을 잘 안둔다.
+
+-- 3. UPDATE : 특정 행의 특정 컬럼을 수정하는 방식, 수정내용을 기록할 수 있으므로 역시 느릴 수 있으나 잘못 업데이트 된 내용 복원 가능
+UPDATE 테이블명
+   SET 수정컬럼명 = 수정값  -- 이 순서 꼭 지키기!! 컬럼 1개만 올 수 있다. 컬럼별로 수정이 가능함. 수정값 상수부분도 서브쿼리가 올 수 있다.
+ WHERE 조건;  -- 서브쿼리가 올 수 있다.
+-- 연습문제) EMP_GROUP에서 SMITH의 SAL을 ALLEN의 SAL과 동일하게 업데이트
+UPDATE EMP_GROUP
+   SET SAL = (SELECT SAL FROM EMP_GROUP WHERE ENAME = 'ALLEN')
+ WHERE ENAME = 'SMITH';
+ 
+ ROLLBACK;
+  
+
+
+SELECT * FROM EMP_GROUP;
+-- 연습문제1) EMP_GROUP 테이블 직원의 SAL을 모두 변경하고자 한다.
+-- 10번 부서의 경우 10%, 20번은 20% 그 외 부서는 30% 인상하고 인상된 연봉으로 업데이트 하여라
+
+ ROLLBACK;
+ DESC EMP_GROUP;
+ 
+ SELECT SAL, DECODE(DEPTNO, 10, SAL*1.1, 20, SAL*1.2, SAL*1.3)
+   FROM EMP_GROUP;
+
+UPDATE EMP_GROUP
+   SET SAL = DECODE(DEPTNO,10,SAL*1.1,20,SAL*1.2,SAL*1.3); -- 특정 대상이 아니라 모든 대상을 변경하는 것이면, WHERE절은 필요가 없다..
+   
+SELECT * FROM EMP_GROUP;
+
+-- 연습문제2) EMP_GROUP 테이블 직원의 COMM을 10% 인상하되 NULL인 경우는 1000으로 수정
+UPDATE EMP_GROUP
+   SET COMM = NVL2(COMM,COMM*1.1,1000);
+UPDATE EMP_GROUP
+   SET COMM = NVL(COMM*1.1,1000);
+ 
+SELECT COMM FROM EMP_GROUP;
+
+-- 연습문제3) EMP테이블의 내용을 모두 EMP_GROUP 테이블에 입력하고 상위관리자보다 연봉이 높은 직원의 정보를 삭제하여라
+INSERT INTO EMP_GROUP
+SELECT * FROM EMP;
+
+DELETE FROM EMP_GROUP E1
+ WHERE  E1.SAL IN (SELECT E2.SAL 
+                    FROM EMP_GROUP E2
+                   WHERE E1.MGR = E2.EMPNO
+                     AND E1.SAL>E2.SAL);
+
+SELECT * FROM EMP_GROUP;
+
+-- 답
+INSERT INTO EMP_GROUP;
+SELECT * FROM EMP;
+
+SELECT E1.ENAME, E1.SAL, E2.ENAME, E2.SAL
+  FROM EMP_GROUP E1, EMP_GROUP E2
+ WHERE E1.MGR = E2.EMPNO(+)
+ ORDER BY E1.ENAME; -- 중복값이 있어서 MAX나 MIN등의 그룹함수를 이용했어야 했다. 쿼리상 문제가 아니라 데이터상 문제였다.
+ 
+DELETE FROM EMP_GROUP E1
+ WHERE E1.SAL > (SELECT MAX(E2.SAL)
+                   FROM EMP_GROUP E2
+                  WHERE E1.MGR = E2.EMPNO);
+                  
+                  
+DELETE FROM EMP_GROUP E1
+ WHERE  E1.SAL > (SELECT E2.SAL 
+                    FROM EMP_GROUP E2
+                   WHERE E1.MGR = E2.EMPNO); -- EMP테이블에서는 수행이 되지만, 중복값을 삽입했기 때문에 그룹함수 반드시 사용!!
+                   
+ROLLBACK;
+
+-- INSERT INTO를 실행 시, NOT NULL 컬럼은 반드시 내용을 채워야 한다. NULL상태로 갈 경우 에러가 난다.
+
+
+-- LOCK : DML 수행 시 TCL(COMMIT, ROLLBACK)을 수행하지 않으면
+-- 해당 트랜잭션이 정상 종료될 때까지 기다리는 현상
+-- => 다른 트랜잭션은 무한 대기에 빠질 수 있음(반드시 주의 필요)
+-- STEP1) A 세션에서 UPDATE 수행
+UPDATE EMP
+   SET SAL = 5000
+ WHERE ENAME ='SMITH';
+ 
+-- STEP2) B 세션에서 UPDATE 수행 : 무한 대기 발생
+UPDATE EMP
+   SET SAL = 5500
+ WHERE ENAME = 'SMITH';
+ 
+-- STEP3) A 세션에서 ROLLBACK 수행 => B세션 즉시 정상 처리 되는 것 확인
+ROLLBACK;
+VAR=1
+:00=0,
+NAME=SQL3
+STMT=76
+--1. 교수에 대한 전체 자료를 다음과 같은 형식으로 만들어 보자
+--(단, 모든 교수들에 대해 출력되도록 한다)
+--교수이름	지도학생수 지도학생_성적평균	A_학점자수	B_학점자수	C_학점자수	D_학점자수
+--심슨      	2	        79	                    1	        0	        0	        1
+--허은	        2	        83	                    0	        1	        1	        0
+--조인형	    1	        97	                    1	        0	        0	        0
+SELECT * FROM EXAM_01;
+SELECT * FROM PROFESSOR;
+
+SELECT P.NAME, COUNT(S.STUDNO), AVG(,
+     
+  FROM PROFESSOR P, STUDENT S, EXAM_01 E
+ WHERE P.PROFNO = S.PROFNO
+   AND E.STUDNO = S.STUDNO
+;
+
+SELECT STUDNO, 
+
+
+--2. STUDENT 테이블과 EXAM_01 테이블을 사용하여
+--각 학생보다 같은 학년 내에 시험성적이 높은 친구의 수를 출력하되,
+--학생이름, 학년, 학과번호, 시험성적과 함께 출력하여라.
+SELECT S.NAME, S.GRADE, S.DEPTNO1, I.MAX_TOTAL
+  FROM STUDENT S, (SELECT STUDNO, MAX(TOTAL) MAX_TOTAL
+                     FROM EXAM_01 E
+                    GROUP BY STUDNO) I
+ WHERE S.STUDNO = I.STUDNO
+   AND ;
+ ;
+ 
+SELECT NAME, GRADE, DEPTNO1,
+       (SELECT MAX(TOTAL) FROM EXAM_01 E WHERE S.STUDNO = E.STUDNO)
+  FROM STUDENT S, ;
+
+SELECT * FROM STUDENT;
+SELECT * FROM EXAM_01;
+
+SELECT *
+  FROM STUDENT S1, STUDENT S2, (SELECT STUDNO, MAX(TOTAL) FROM EXAM_01 E GROUP BY STUDNO) I
+ WHERE S1.GRADE = S2.GRADE
+   AND S1.STUDNO != S2.STUDNO
+   AND S1.STUDNO = I.STUDNO;
+   
+SELECT *
+  FROM STUDENT S, STUDENT S2,EXAM_01 E
+ WHERE S.STUDNO = E.STUDNO
+   AND S.GRADE = S2.GRADE
+   AND E.TOTAL = (SELECT MAX(TOTAL)
+                    FROM EXAM_01 E2
+                   WHERE S.STUDNO = E2.STUDNO);
+ 
+--3. student2 테이블을 student 테이블과 동일하게 만들고 
+--create table STUDENT2 as select * from STUDENT;
+--student2 테이블에서 제1의 전공번호가 301인 학생들의 출생년도와 동일한 학생들을 삭제하여라.
+SELECT * FROM STUDENT3;
+DELETE FROM STUDENT3
+ WHERE SUBSTR(JUMIN,1,2) IN (SELECT SUBSTR(JUMIN,1,2) FROM STUDENT3 WHERE DEPTNO1 = 301);
+
+
+--4. STUDENT2 테이블에서 각 학년별 최대키를 갖는 학생을 찾아 삭제하여라.
+SELECT * FROM STUDENT;
+
+CREATE TABLE STUDENT4
+AS
+SELECT * FROM STUDENT;
+
+SELECT * FROM STUDENT4;
+
+DELETE FROM STUDENT4
+WHERE (GRADE,HEIGHT) IN (SELECT GRADE, MAX(HEIGHT) FROM STUDENT4 GROUP BY GRADE);
+
+ROLLBACK;
+
+SELECT * FROM STUDENT4;
+
+
+VAR=0

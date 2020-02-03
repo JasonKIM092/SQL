@@ -1,0 +1,482 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-08-26 16:20
+[WORKSPACE]
+COUNT=2
+NAME=20190826.sqd
+STMT=415
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-08-26 15:57
+[WORKSPACE]
+COUNT=3
+NAME=20190823문제풀이
+STMT=102
+--1. professor 테이블에서 각 교수의 이메일 아이디를 출력하되,
+--다음의 특수기호를 제거한 형태로 출력하여라.
+select NAME,ID,EMAIL,
+       translate(EMAIL,'1!@#$%^&*_+-().','1') AS 특수기호생략
+  from professor;
+
+--답
+select EMAIL,
+       instr(EMAIL,'@') AS "@위치",
+       substr(EMAIL,1,instr(EMAIL,'@')-1) AS "email id",
+       translate(substr(EMAIL,1,instr(EMAIL,'@')-1),
+                 '1_-*^%$', '1') AS 특수기호생략
+  from professor;
+
+--2. student 테이블에서 전화번호 형식을 다음과 같이 변경하세요.
+--051)426-1700 => 051 426 1700 : replace를 사용하려면 051)-426... 이런식으로 특수기호가 붙어있어야 한다.
+select NAME,TEL,
+       translate(TEL,')-','  ') AS 변경 -- 두칸띄기
+  from student;
+
+--3. EMP 테이블을 이용하여 사원이름, 입사일 및 급여검토일을 표시합니다. ^
+-- 급여검토일은 여섯달 근무후 해당되는 첫번째 월요일입니다.
+-- 날짜는 "Sunday the Seventh of September, 1981" 형식으로 표시하도록 한다.
+-- 열 이름은 check로 한다.
+alter session set nls_date_language='american';
+select ENAME,HIREDATE,
+       to_char(HIREDATE, 'DAY') AS "요일",
+       to_char(next_day(add_months(HIREDATE,6),2),'Day"the "Ddspth" of "Month", "YYYY') AS "check"
+  from emp;
+  
+--답
+alter session set nls_date_language='american';
+select ENAME,HIREDATE,
+       next_day(add_months(HIREDATE,6),2),
+       to_char(next_day(add_months(HIREDATE,6),2),
+               'Day "the" Ddspth "of" Month, YYYY') -- 중간에 공백을 제거하려면 trim이랑 연결연산자(||)를 써야한다.
+  from emp;
+
+
+--4. student 테이블에서 jumin 컬럼을 사용하여 생년월일이 다음 사이인 학생의 정보를 출력하세요.
+--(19760205 ~ 19760924)
+desc emp; --CHAR(13)
+select name, jumin
+  from student
+ where to_char(to_date(substr(JUMIN,1,6),'RRMMDD'),'RRRRMMDD')
+ between '19760205' and '19760924';
+ 
+ --답
+ select NAME, JUMIN, to_date(substr(JUMIN,1,6),'RRMMDD')
+   from student
+  where to_date(substr(JUMIN,1,6),'RRMMDD') between to_date('19760205','YYYYMMDD') --to_date(19760205,'YYYYMMDD') 19760205를 숫자이던 문자이던 상관 없다. 즉, 19760205로 바로 쓰던 '19760205'로 쓰던 상관 없다. 오라클에서만 가능한 기능이고, 타 언어에서는 무조건 문자로 묶는다...
+    and to_date('19760924','YYYYMMDD');
+ 
+
+--5. emp 테이블을 이용하여 현재까지 근무일수를 xx년 xx개월 xx일 형태로 출력하세요.^
+select ENAME, HIREDATE, sysdate,
+       floor((sysdate - hiredate)/365)||'년' AS 년,
+       floor(mod((sysdate - hiredate)/365,floor((sysdate - hiredate)/365)) *12)||'개월' AS 개월,
+       abs(to_char(sysdate, 'DD')-to_char(hiredate,'DD'))||'일' AS 일
+  from emp;
+  
+--답
+select ENAME, HIREDATE,
+       trunc(sysdate-hiredate) AS 근무일수,
+       trunc((sysdate-hiredate)/365) AS 근속년수,
+       trunc(months_between(sysdate, hiredate)) AS 근무개월수,
+       mod(trunc(months_between(sysdate, hiredate)),12) AS 근속개월수,
+       sysdate,
+       trunc(sysdate - add_months(hiredate, trunc(months_between(sysdate, hiredate))))
+       AS "나머지 근무일수"
+  from emp;
+  
+select 464, 38*12+8 from dual;
+
+
+-- 실습문제
+--1)
+select ename,
+       trunc(sysdate - hiredate) AS 근무일수,
+       trunc(months_between(sysdate,hiredate)/4) AS 근무주 
+  from emp
+ order by trunc(sysdate - hiredate) desc,
+          trunc(months_between(sysdate,hiredate)/4) desc;
+ 
+--2)
+select ENAME, HIREDATE,
+       trunc(months_between(sysdate,HIREDATE)) AS 근무월수
+  from emp
+ where DEPTNO=10;
+ 
+--3)
+select ENAME,HIREDATE
+  from emp;
+select ename, hiredate,
+       last_day(HIREDATE)-HIREDATE AS "입사한 달의 남은 근무 일수"
+  from emp;
+  
+--4)
+select ename, hiredate,
+       next_day(HIREDATE,6) AS "돌아오는 금요일"
+  from EMP
+ where deptno = 10;
+VAR=0
+NAME=SQL3
+STMT=284
+-- 일반함수
+-- 1) NVL(NULL 값이 포함된 컬럼, 치환값) : NULL 치환 함수
+-- 기본적으로 첫번째 인자와 두번째 인자의 데이터 타입은 일치해야 함
+select comm, nvl(comm,0)
+  from emp;
+  
+select comm, nvl(comm,'X') -- 컬럼 데이터 타입이 숫자라서 불가능 정 사용하고 싶으면 컬럼의 타입을 변경, 에러발생:comm(숫자)와 'X'(문자)의 형 불일치
+  from emp;
+  
+select comm, nvl(to_char(comm),'X') -- 수행가능: 데이터타입 형 일치
+  from emp;
+  
+select comm, nvl(to_char(comm),0) -- 수행가능: 문자컬럼에는 숫자입력이 가능하다. 문자가 숫자를 포함한다. 물론 숫자가 삽입되는 순간 문자로 형 변형(NVL의 결과값의 데이터 타입은 첫번째 인자의 데이터 타입으로 결정됨). 하지만 문자를 숫자로 변형하는 것은 불가하므로 comm과 'X'는 수행이 안된 것이다.
+  from emp;
+
+select comm, nvl(comm,'') --수행가능
+  from emp;
+
+select comm, nvl(comm,' ') --에러 : 공백은 문자이다. 공백도 1바이트를 차지하고 있는 문자입!!
+  from emp;
+
+-- 2) NVL2(컬럼,NULL이 아닐 경우 치환 값 ,NULL일 경우 치환 값)  
+--      : NULL 치환 함수이긴 하나 NULL이 아닌 경우도 치환 시 사용, 데이터 타입은 두번째, 세번째 인자만 맞춰주면 된다. 첫번째는 대상만 될뿐 두번째 세번째 인자와 맞출필요 없다.
+-- 기본적으로 두 번째 인자와 세 번째 인자의 데이터 타입이 일치해야 함
+select comm, NVL2(comm, 'null이 아니다', 'null이다')
+  from emp;
+  
+select comm, nvl2(comm, 100, 'null이다') -- 에러발생 : 두번째, 세번째 인자데이터타입 불일치
+  from emp;
+  
+select comm, nvl2(comm, '100', 'null이다') -- 에러발생 안함 : 두번째, 세번째 인자데이터타입 일치. '100' 문자 혹은 to_char(100)으로
+  from emp;
+  
+select comm, nvl2(comm, 'null이 아니다', 0) -- 출력됨 : NVL2 최종 결과값의 데이터 타입은 두번째 인자의 데이터 타입에 의해 결정되므로, 세번째 인자의 0은 문자로 해석된다. 문자가 숫자를 포함하는 개념이다.
+  from emp;                                 -- 에러발생 X : 문자컬럼으로 생성, 숫자 삽입 가능
+  
+  
+-- 3) decode : if문(조건문)의 축약형이며 확장 가능한 함수, 반드시 =(equal) 조건만 가능, 중첩하여 사용 가능 ex)decode(decode) 근데 성능상 사용을 권하지 않는다. case문 사용할 것. 성능은 case문이 더 좋다.
+-- decode(조사대상, 조건1, 치환1, 조건2, 치환2,.......,조건n, 치환n, else값) , 대소비교불가
+-- 번외. if문은 pl/sql에서는 사용가능하나 현재 배우는 sql에서는 사용이 불가하다고 한다.
+-- if문의 축약형이기 때문에 조건이 안들어간다!!! ex) deptno=10과 같은 조건
+if 조사대상 = 조건1 then 치환1,
+   조사대상 = 조건2 then 치환2,
+    ...
+                    else else값
+;
+
+select ename, deptno,
+       decode(deptno,10,'총무부',20,'재무부','IT부') -- 치환될 대상의 데이터타입을 일치시켜준다!! ex) 총무부 재무부 와 같이.. 데이터 타입을 한개로 일치   
+  from emp;
+  
+
+if 조사대상 = 조건1 then if 조사대상2 = 조건 then ...,
+   조사대상 = 조건2 then 치환2,
+    ...
+                    else else값
+;
+
+-- 중첩 decode문 : 조건문의 결과에 또 조건이 필요한 경우
+-- 예제)
+-- deptno가 10이면서 job이 clerk인 직원은 'A', 나머지는 'AA'
+--          20이면서 job이 manager 인 직원은 'B', 나머지는 'BB'
+--          나머지는 모두 'C'
+decode(job,'clerk', 'A','AA');
+
+select ename, deptno, JOB,
+       decode(deptno,10,decode(job,'CLERK','A','AA'), -- deptno가 10번이면서, job이 clerk이면 A, 아니면 AA
+                     20,decode(job,'MANAGER','B','BB'), -- deptno와 10의 데이터 타입은 일치시킬것.
+                       'C')   
+  from emp;
+  
+ 
+select *
+  from emp;
+  
+  
+--실습문제 1) EMP테이블에서 부서번호가 10이면 'A'로, 20이면 'B'로, 30이면 'C'로 바꾼 뒤 이름, 업무, 부서번호와 함께 출력하여라.
+select ENAME,JOB,DEPTNO,
+       decode(DEPTNO,10,'A',20,'B',30,'C') -- else값을 사용하지 않으면 NULL로 리턴된다.
+  from emp;
+  
+--실습문제 2) EMP테이블에서 JOB이 ANALYST이면 급여 증가는 10%이고, CLERK이면 15%, MANAGER이면 20%이고,
+--            다른 업무에 대해서는 급여 증가가 없다.
+--            사원번호, 이름, 업무, 급여, 증가된 급여를 출력하여라.
+
+select EMPNO,ENAME,JOB,SAL,
+       decode(JOB, 'ANALYST', SAL*1.1,
+                   'CLERK', SAL*1.15,
+                   'MANAGER', SAL*1.2, SAL) AS "증가된 급여"
+  from emp;
+  
+--실습문제 3) EMP테이블의 사원이름, 매니저번호(MGR)를 출력하고, 매니저번호가 NULL이면
+--            '상위관리자'로 표시하고, 매니저번호가 있으면 '0000(매니저번호)담당'으로 표시하여라.
+desc emp;
+select * from emp;
+select ENAME,MGR,
+       NVL2(MGR,MGR||'담당','상위관리자') AS 담당자, -- MGR||'담당' : 자동으로 문자로 변환시켜줌. 정석은 to_char(MGR)||'담당'
+       NVL2(MGR,to_char(MGR)||'담당','상위관리자') AS 담당자
+  from emp;
+  
+-- 4) case문 : 조건문, decode문 보다 성능적으로 유리, 대소 비교 가능, <,>,=,in 연산자, between연산자, like연산자 가능
+case when 조건1 then 출력1
+     when 조건2 then 출력2
+     ...
+                else else값
+ end
+ ;
+ 
+ select ename, deptno,
+        case when deptno = 10 then 'A'  -- then 다음에 데이터타입 일치시킬 것 
+             when deptno = 20 then 'B'
+             when deptno = 30 then 'C'
+                              else 'D'
+         end AS 부서명 -- end 반드시 사용!!
+  from emp;
+  
+-- case문의 축약형 : 조건대상이 모두 동일하며, 동등비교일 경우 아래와 같이 축약 가능
+-- 단, 반드시 비교대상컬럼과 상수의 데이터 타입은 일치해야 함.(묵시적 형 변환 발생 안함)
+select ename, deptno,
+        case deptno when 10 then 'A'   -- 축약형 : 축약형을 쓰려면 조건 : 검사대상동일(when 다음 컬럼), =(equal)이 동일할 경우 가능하다. 대소비교시에는 불가능.
+                    when 20 then 'B'   -- 축약형에서는 숫자컬럼을 문자컬럼으로 잘못 사용할 경우, 에러발생!!데이터타입은 절대로 꼭 지킬것!! 축약형이 아닌 경우는 묵시적형변환을 한다. 하지만 축약형에서는 묵시적형변형 안됨.
+                    when 30 then 'C'
+                              else 'D'
+         end AS 부서명 -- end 반드시 사용!!
+  from emp;  
+  
+select ename, deptno,
+        case deptno when '10' then 'A'   -- 부서번호를 '10'인 문자와 비교시 에러 발생
+                    when '20' then 'B'   
+                    when '30' then 'C'
+                              else 'D'
+         end AS 부서명 
+  from emp; 
+  
+  
+-- 연습문제) student테이블에서 jumin 컬럼을 사용하여 성별 컬럼 생성 (남자, 여자)
+desc student; JUMIN NOT NULL CHAR(13) ;
+select NAME, GRADE, JUMIN,
+       case when substr(JUMIN,7,1) = '1' then '남자'
+            when substr(JUMIN,7,1) = '2' then '여자'
+        end AS 성별
+  from student;
+  
+select NAME, GRADE, JUMIN,
+       case substr(JUMIN,7,1) when '1' then '남자'
+                              when '2' then '여자'
+        end AS 성별,
+        decode(substr(JUMIN,7,1),'1','남자','여자') AS decode
+  from student;
+  
+select NAME, GRADE, JUMIN,
+       case when substr(JUMIN,7,1) = '1' then '남자'
+                                         else '여자'
+        end AS 성별
+  from student;
+  
+select NAME, GRADE, JUMIN,
+       case substr(JUMIN,7,1) when '1' then '남자'
+                                       else '여자'
+        end AS 성별
+  from student;
+
+
+
+-- decode와 sign함수를 사용한 대소의 비교 치환
+-- decode 자체는 조건식으로 대소를 사용할 수 없으므로 sign함수의 결과를 사용
+-- 예) sal이 2000보다 큰 경우 'A', 아니면 'B'로 치환
+select sal, sal - 2000, sign(sal - 2000),
+       decode(sign(sal-2000),1,'A','B')
+  from emp;
+  
+------------------------------------------------------------------------------------------------  
+  
+-- 그룹함수 = 복수행 함수 = 다중행 함수 : 그룹별 함수는 이미 집단을 축약한 데이터이기 때문에 개별적인 각 행의 결과값을 나타내는 데이터와 함께 표현할 수 없다.
+-- group by구문 : 그룹별 연산을 수행하기 위해 그룹을 표현해주는 구문
+-- 분리(distinct value의 개수만큼) -> 그룹함수에 적용 -> 결합 -> 출력
+
+select deptno, avg(sal), max(ename) -- ename : group by 표현식이 아닙니다. 한줄에 표현이 불가하므로, 즉 사람 각각의 이름을 10번 부서 한 줄에 표현이 불가하다. 하지만 MAX와 같은건 가능하다. 세줄로 표현이 가능하므로. max : 가장 마지막에 오는 단어를 선택해주는 함수.
+  from EMP
+ group by deptno;
+ 
+-- group by 컬럼 이외의 컬럼은 select절에 단독으로 올릴 수 없고, 그룹함수와 함께 표현되어야 한다.
+-- 예) emp테이블에서 부서별 최대 연봉 값 출력, 최대 연봉자 정보 함께 출력 불가능 -> 서브쿼리기법을 사용해야 한다.
+select deptno, max(sal)
+  from EMP
+group by deptno;
+
+DEPTNO JOB SAL
+10      A  10
+30      B  20
+20      C  30
+GROUP BY DEPTNO
+GROUP BY DEPTNO, JOB
+이런 경우 결과값은 똑같다.
+GROUP BY의 2차 분류가 영향을 미치기 위해서는 1차 분류에 중복값이 있어야 의미가 있다.
+
+
+SELECT DEPTNO, AVG(SAL), JOB
+  FROM ...
+ GROUP BY DEPTNO
+ 에서 GROUP BY에 JOB을 사용하지 않았으므로  SELECT절에서도 JOB을 사용하지 못한다.
+ 옳게 표현한 식은 
+ SELECT DEPTNO, AVG(SAL), JOB
+  FROM ...
+ GROUP BY DEPTNO, JOB
+
+ 
+ 다만, GROUP BY DEPTNO와 GROUP BY DEPTNO, JOB의 결과값이 동일해야 한다는 전제조건이 있다.
+
+예를들어
+DEPTNO JOB
+10      A 
+30      B 
+30      A
+20      C
+이런 상황이어야 GROUP BY DEPTNO, JOB가 효과가 있다.
+
+
+CF) ORDER BY도 위와 같다.
+DEPTNO JOB
+10      A
+30      B
+20      C
+ORDER BY DEPTNO
+ORDER BY DEPTNO, JOB
+이런 경우 결과값은 똑같다.
+ORDER BY의 2차 분류가 영향을 미치기 위해서는 1차 분류에 중복값이 있어야 의미가 있다.
+
+예를들어
+DEPTNO JOB
+10      A
+30      B
+30      A
+20      C
+이런 상황이어야 ORDER BY DEPTNO, JOB가 효과가 있다.
+;
+-- 1) min, max : NULL값에 영향을 받지 않음
+-- 2) avg : NULL을 COUNT 하지 않는다. NULL을 제외한 데이터의 평균을 계산, NULL 데이터도 포함시키려면 NVL함수 사용.
+select avg(comm) AS 평균1,  -- comm 받은 직원만 나눔
+       sum(comm)/count(empno) AS 평균2, -- 모든 직원으로 나눔
+       avg(nvl(comm,0)) AS 평균3 -- 평균2와 같은 계산법으로 바뀜
+  from emp;
+
+-- 3) count : 부서별인원수 구할때, NULL을 제외한 데이터의 수를 셈
+select count(*), -- 테이블의 총 갯수. 모든 행 다 계산
+       count(empno), -- 한개의 컬럼으로 계산 but, not null 컬럼으로 세기!! desc emp;를 통해서 not null행 확인하기. NOT NULL 선언된 컬럼이므로 행의 수를 세기 가장 적절한 컬럼.
+       count(comm) -- NULL을 제외한 데이터의 수를 셈.  NULL을 제외하고 세기 때문에 총 행의 수와 결과가 다름.
+  from emp;
+ 
+-- 4) sum : NULL값에 영향을 받지 않음
+
+-- 연습문제1) student 테이블에서 성별 키와 몸무게의 최대, 최소를 출력
+select decode(substr(JUMIN,7,1),'1','남자','여자') AS 성별,
+       max(HEIGHT), min(HEIGHT), max(WEIGHT), min(WEIGHT)       
+  from student
+ group by decode(substr(JUMIN,7,1),'1','남자','여자');
+
+-- 연습문제2) professor 테이블에서 직급별(POSITION) pay의 평균 출력
+select position, round(avg(PAY)) -- round : 반올림 함수
+  from professor
+ group by POSITION;
+  
+-- 연습문제3) professor 테이블에서 입사년도별 pay의 평균 출력
+select to_char(HIREDATE, 'YYYY') AS 입사년도, avg(pay)
+  from professor
+ group by to_char(HIREDATE, 'YYYY') -- 정렬하고 싶으면 order by로 한다. 
+ order by 입사년도; -- order by는 select 절에서 사용한 Alias를 그대로 사용 가능. order by 절에서만 사용가능
+ 
+-- HAVING절 : 조건식이긴 하나 그룹함수의 결과에 대한 조건을 사용하는 경우 반드시 필요
+-- GROUP BY절이 먼저 수행된 뒤에 연산되는 순서
+-- ORDER BY절과 다른점 : WHERE절은 일반 조건이 사용, HAVING은 그룹조건이 사용
+SELECT JOB, AVG(SAL)
+  FROM EMP
+ -- WHERE AVG(SAL) >= 2000 -- WHERE 절에는 절대로 그룹함수가 와서는 안된다. 이유 : 그룹함수는 GROUP BY 함수가 선행되어야 연산순서에 맞다. WHERE 절에서 그룹함수는 아직 계산할 수 있는 순서가 아니다. 문법계산순서 참고!! FROM -> WHERE -> GROUP BY -> HAVING -> SELECT -> ORDER BY. 그래서 HAVING을 쓴다.
+ GROUP BY JOB
+ HAVING AVG(SAL) > 2000;
+ 
+ -- 만약 WHERE절과 HAVING절에 모두 쓸수 있는 조건이라면? 반드시 WHERE절에서 쓰는 것이 유리. 이유: 순서. WHERE 절이 HAVING절보다 계산순서가 선행되므로.
+ SELECT DEPTNO, AVG(SAL)
+  FROM EMP
+ WHERE DEPTNO ! =10 
+ GROUP BY DEPTNO
+ --HAVING DEPTNO ! =10
+ ;
+VAR=0
+NAME=SQL4
+STMT=12
+-- 시험문제 총 16문제
+-- 기본적인 함수의 사용법
+-- ex) 06/08/19 이 것을 19년 6월 8일로 읽기 위해 필요한 함수를 쓰시오
+-- error가 발생하는 이유 및 해결방안
+-- 형변환함수
+-- 연결연산자 붙이는 방법
+-- alias "" 붙여야 하는 상황
+-- replace instr substr translate 문자함수
+-- 숫자함수, 날짜함수는 많이 안냄 기본적인 함수들
+-- 일반함수 decode case
+-- 시험범위 : case까지
+-- 시험시간 : 4시
+VAR=0
+
+VAR=0
+NAME=SQL2
+STMT=54
+--1) Student 테이블의 jumin 컬럼을 참조하여 학생들의 이름과 태어난 달, 그리고 분기를 출력하라.
+--태어난 달이 01-03월 은 1/4분기, 04-06월은 2/4 분기, 
+--07-09 월은 3/4 분기, 10-12월은 4/4 분기로 출력하라 (decode,case모두)
+
+--2) EMP2 테이블에서 출생년도(1960,1970,1980,1990)별로 평균연봉을 구하라.
+
+--3) emp 테이블에서 인상된 연봉을 기준으로 2000 미만은 'C',
+--2000이상 4000미만은 'B', 4000이상은 'A' 등급을 부여하여 각 직원의 현재 연봉과 함께 출력
+--**인상된 연봉은 기존 연봉 대비 15% 상승률 + 보너스(comm)
+
+--4) emp 테이블을 사용하여 연봉기준 등급을 아래의 기준에 맞게 표현하세요.
+--2000미만 'C', 2000이상 3000이하 'B', 3000초과 'A'
+
+--5) 레포트를 작성하고자 한다.
+--emp 테이블을 이용하여 각 부서별 직원수를 출력하되 다음과 같은 형식으로 작성하여라.
+--
+--레포트명	       10_직원수	 20_직원수	  30_학생수
+----------------------------------------------------------
+--본인이름 레포트	        3	         5           6
+
+
+-- 실습문제)
+-- 1)
+select count(EMPNO) AS 사원수, max(SAL), min(SAL), round(avg(sal)) AS 급여평균
+  from emp
+ group by DEPTNO
+ order by 급여평균;
+ 
+ select *
+   from emp;
+   
+-- 2)
+select JOB, count(EMPNO) AS 사원수, round(avg(sal)) AS 급여평균
+  from EMP
+ group by JOB
+ order by JOB;
+ 
+-- 3)
+select JOB, DEPTNO, count(empno) AS 사원수, round(avg(sal)) AS 급여평균
+  from EMP
+ group by JOB, DEPTNO
+ order by 급여평균 desc;
+ 
+-- 4)
+select deptno, count(empno) AS 인원수, sum(sal) AS "급여의 합"
+  from EMP
+  group by DEPTNO
+ having count(DEPTNO) > 4;
+ 
+-- 5)
+select JOB, round(avg(sal)) AS 급여평균, sum(sal) AS "급여의 합"
+  from EMP
+ group by JOB
+having avg(sal) >= 3000;
+VAR=0

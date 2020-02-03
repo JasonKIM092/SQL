@@ -1,0 +1,280 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-09-03 12:47
+[WORKSPACE]
+COUNT=2
+NAME=SQL1
+STMT=150
+--1. 교수에 대한 전체 자료를 다음과 같은 형식으로 만들어 보자
+--(단, 모든 교수들에 대해 출력되도록 한다)
+--교수이름	지도학생수 지도학생_성적평균	A_학점자수	B_학점자수	C_학점자수	D_학점자수
+--심슨      	2	        79	                    1	        0	        0	        1
+--허은	        2	        83	                    0	        1	        1	        0
+--조인형	    1	        97	                    1	        0	        0	        0
+SELECT * FROM EXAM_01;
+SELECT * FROM PROFESSOR;
+
+SELECT P.NAME, COUNT(S.STUDNO), AVG(,
+     
+  FROM PROFESSOR P, STUDENT S, EXAM_01 E
+ WHERE P.PROFNO = S.PROFNO(+)
+   AND s.STUDNO = e.STUDNO
+;
+
+SELECT STUDNO, ;
+
+-- 답
+-- p - s(+) - e(+) - h(+)
+
+select p.name, count(s.STUDNO) 학생수, nvl(round(avg(e.TOTAL)),0) 평균,
+       count(decode(substr(h.grade,1,1),'A',1)) A학점자수,  -- count(decode(substr(h.grade,1,1),'A',1)) = count(decode(substr(h.grade,1,1),'A',1,NULL)) =  sum(decode(substr(h.grade,1,1),'A',1,0))
+       sum(decode(substr(h.grade,1,1),'B',1,0)) B학점자수,
+       count(decode(substr(h.grade,1,1),'C',1, NULL)) C학점자수,
+       count(decode(substr(h.grade,1,1),'D',1)) D학점자수
+  from professor p, student s, EXAM_01 e, HAKJUM h
+ where p.profno = s.PROFNO(+)
+   and s.STUDNO = e.STUDNO(+)
+   and e.TOTAL between h.MIN_POINT(+) and h.MAX_POINT(+)
+ group by p.NAME;
+
+select * from HAKJUM;
+ -- count(decode(substr(h.grade,1,1),'A',1)) =  sum(decode(substr(h.grade,1,1),'A',1,0))
+
+--2. STUDENT 테이블과 EXAM_01 테이블을 사용하여
+--각 학생보다 같은 학년 내에 시험성적이 높은 친구의 수를 출력하되,
+--학생이름, 학년, 학과번호, 시험성적과 함께 출력하여라.
+SELECT S.NAME, S.GRADE, S.DEPTNO1, I.MAX_TOTAL
+  FROM STUDENT S, (SELECT STUDNO, MAX(TOTAL) MAX_TOTAL
+                     FROM EXAM_01 E
+                    GROUP BY STUDNO) I
+ WHERE S.STUDNO = I.STUDNO
+   AND ;
+ ;
+ 
+SELECT NAME, GRADE, DEPTNO1,
+       (SELECT MAX(TOTAL) FROM EXAM_01 E WHERE S.STUDNO = E.STUDNO)
+  FROM STUDENT S, ;
+
+SELECT * FROM STUDENT;
+SELECT * FROM EXAM_01;
+
+SELECT *
+  FROM STUDENT S1, STUDENT S2, (SELECT STUDNO, MAX(TOTAL) FROM EXAM_01 E GROUP BY STUDNO) I
+ WHERE S1.GRADE = S2.GRADE
+   AND S1.STUDNO != S2.STUDNO
+   AND S1.STUDNO = I.STUDNO;
+   
+SELECT *
+  FROM STUDENT S, STUDENT S2,EXAM_01 E
+ WHERE S.STUDNO = E.STUDNO
+   AND S.GRADE = S2.GRADE
+   AND E.TOTAL = (SELECT MAX(TOTAL)
+                    FROM EXAM_01 E2
+                   WHERE S.STUDNO = E2.STUDNO);
+                   
+-- 답
+-- S1(+) - E1(+)       (S1 - E1)
+--  |       |      =>      |          : SUB QUERY
+-- S2(+) - E2(+)       (S2 - E2) (+)
+
+SELECT S1.NAME 학생이름, S1.GRADE, S1.DEPTNO1, E1.TOTAL,
+       COUNT(S2.STUDNO) 친구수
+  FROM STUDENT S1, EXAM_01 E1, STUDENT S2, EXAM_01 E2
+ WHERE S1.STUDNO = E1.STUDNO(+)                       -- 모든 조건에 (+)가 붙어서 오류가 남... 조건별로 보면 아니지만, 관계별로 보면 전체 (+)가 붙어 있는 상황이므로 FULL OUTER JOIN.
+   AND S2.STUDNO(+) = E2.STUDNO
+   AND S1.GRADE(+) = S2.GRADE
+   AND E1.TOTAL < E2.TOTAL(+)
+ GROUP BY S1.STUDNO, S1.NAME, S1.GRADE, S1.DEPTNO1, E1.TOTAL;  -- 쿼리오류
+ 
+SELECT S1.NAME, S1.GRADE, S1.DEPTNO1, E1.TOTAL
+  FROM STUDENT S1, EXAM_01 E1
+ WHERE S1.STUDNO = E1.STUDNO;
+   
+SELECT I1.NAME 학생이름, I1.GRADE, I1.DEPTNO1, I1.TOTAL,     -- 올바른 쿼리
+       COUNT(I2.STUDNO) 친구수
+  FROM (SELECT S1.STUDNO, S1.NAME, S1.GRADE, S1.DEPTNO1, E1.TOTAL
+          FROM STUDENT S1, EXAM_01 E1
+         WHERE S1.STUDNO = E1.STUDNO) I1,
+       (SELECT S2.STUDNO, S2.NAME, S2.GRADE, S2.DEPTNO1, E2.TOTAL
+          FROM STUDENT S2, EXAM_01 E2
+         WHERE S2.STUDNO = E2.STUDNO) I2
+ WHERE I1.GRADE = I2.GRADE(+)
+   AND I1.TOTAL < I2.TOTAL(+)
+ GROUP BY I1.STUDNO, I1.NAME, I1.GRADE, I1.DEPTNO1, I1.TOTAL; -- STUDNO 가 메인쿼리절에 들어가서 출력이 되기 위해서는 FROM절에서 선언이 되어야 한다.
+
+ 
+--3. student2 테이블을 student 테이블과 동일하게 만들고 
+--create table STUDENT2 as select * from STUDENT;
+--student2 테이블에서 제1의 전공번호가 301인 학생들의 출생년도와 동일한 학생들을 삭제하여라.
+SELECT * FROM STUDENT3;
+
+DELETE FROM STUDENT3
+ WHERE SUBSTR(JUMIN,1,2) IN (SELECT SUBSTR(JUMIN,1,2) 
+                               FROM STUDENT3 
+                              WHERE DEPTNO1 = 301); -- 출생년도 TO_CHAR(BIRTHDAY,'YYYY')
+
+create table STUDENT6 as select * from STUDENT;
+select * from student6;
+
+DELETE FROM STUDENT7
+ WHERE TO_CHAR(BIRTHDAY,'YYYY') = (SELECT TO_CHAR(BIRTHDAY,'YYYY')
+                                      FROM STUDENT7
+                                     WHERE DEPTNO1 = 301);
+
+--4. STUDENT2 테이블에서 각 학년별 최대키를 갖는 학생을 찾아 삭제하여라.
+SELECT * FROM STUDENT;
+
+CREATE TABLE STUDENT4
+AS
+SELECT * FROM STUDENT;
+
+SELECT * FROM STUDENT4;
+
+DELETE FROM STUDENT4
+WHERE (GRADE,HEIGHT) IN (SELECT GRADE, MAX(HEIGHT) 
+                           FROM STUDENT4 
+                          GROUP BY GRADE);
+
+ROLLBACK;
+
+SELECT * FROM STUDENT4;
+
+
+
+create table STUDENT7 as select * from STUDENT;
+select * from student7;
+
+DELETE FROM STUDENT6 S1
+ WHERE HEIGHT IN (SELECT MAX(HEIGHT)
+                    FROM STUDENT6 S2
+                   WHERE S1.GRADE = S2.GRADE);
+                   
+DELETE FROM STUDENT6
+ WHERE (GRADE,HEIGHT) IN (SELECT GRADE,MAX(HEIGHT)
+                            FROM STUDENT6
+                           GROUP BY GRADE);
+
+
+VAR=0
+NAME=SQL2
+STMT=109
+-- DML : 데이터 수정 언어(INSERT : 삽입, DELETE : 행단위 삭제, UPDATE : 수정, MERGE : 병합(INSERT, DELETE, UPDATE를 한번에 사용하는 명령어))
+-- 데이터 수정 후 저장여부 명령어(TCL) 필요(COMMIT : 저장하겠다, ROLLBACK : 저장하지 않고 전의 상태로 돌리겠다.)
+--
+-- DDL : 데이터 정의 언어(CREATE : 데이터구조생성, DROP : 구조삭제, ALTER : 구조적변경, TRUNCATE : 구조삭제) TRUNCATE는 DDL에 포함
+
+-- DDL
+-- 1. CREATE TABLE
+CREATE TABLE 테이블명
+(컬럼1 데이터타입 제약조건,
+ 컬럼2 데이터타입 제약조건,
+ ...
+);
+
+-- 예제)
+CREATE TABLE DDL_TEST1
+( COL1 NUMBER(4),
+  COL2 VARCHAR2(10),
+  COL3 CHAR(10),
+  COL4 DATE DEFAULT SYSDATE);
+  
+INSERT INTO DDL_TEST1(COL1,COL2,COL3) VALUES(11111,'A','A');
+-- 지정된 자리수보다 큰... 에러 발생(COL1 컬럼 자리수 초과)
+
+INSERT INTO DDL_TEST1(COL1,COL2,COL3) VALUES(1111,'A','A');
+SELECT * FROM DDL_TEST1;
+-- COL4에 NULL이 들어갈 수 있으며 자동으로 DEFAULT 값으로 변경되어 입력된다.
+
+--** VARCHAR2와 CHAR의 차이
+SELECT LENGTH(COL2) AS 가변형문자타입, --'A'
+       LENGTH(COL3) AS 고정형문자타입  --'A         '
+  FROM DDL_TEST1;
+  
+COMMIT;
+SELECT *
+  FROM DDL_TEST1
+ WHERE COL3='A'; -- COL3의 문자는 'A         '이런식이라서 원래 옆의 명령어는 조회가 안되어야 한다. 정석은 TRIM(COL3)이어야 한다.
+ 
+ SELECT *
+  FROM DDL_TEST1
+ WHERE TRIM(COL3) ='A'; -- 이런식으로 해야한다.
+
+-- 2. ALTER TABLE : 테이블의 구조 변경(컬럼추가, 컬럼수정, ...)
+-- 1) 컬럼추가
+ALTER TABLE 테이블명 ADD (컬럼1이름 데이터타입, 컬럼2이름 데이터타입, ...); -- 테이블 중간위치에 컬럼생성 불가하다.
+
+-- 예제)
+CREATE TABLE STUDENT8 AS SELECT * FROM STUDENT;
+ALTER TABLE STUDENT8 ADD (JUMSU NUMBER);
+ALTER TABLE STUDENT8 ADD (JUMSU2 NUMBER DEFAULT 0); -- 디폴트값 기입의 차이!!
+SELECT * FROM STUDENT8;
+
+-- 2) 컬럼 이름 변경
+ALTER TABLE 테이블명 RENAME COLUMN 기존컬럼명 TO 새로운컬럼명;
+ALTER TABLE STUDENT8 RENAME COLUMN JUMSU TO TOTAL;
+SELECT * FROM STUDENT8;
+
+--** 참고) 오브젝트 이름 변경(테이블명 변경, 인덱스명 변경, ...) : 컬럼은 오브젝트가 아니다. 오브젝트는 CREATE로 생성하고 DROP으로 삭제가 가능한 것이다.
+RENAME 기존오브젝트이름 TO 새오브젝트이름;
+RENAME STUDENT8 TO STUDENT_BACKUP;
+
+-- 3) 컬럼 데이터 타입 변경
+ALTER TABLE 테이블명 MODIFY (컬럼이름 변경후데이터타입);
+ALTER TABLE STUDENT_BACKUP MODIFY (STUDNO NUMBER(10));   -- 더 큰 사이즈 변경 가능
+ALTER TABLE STUDENT_BACKUP MODIFY (STUDNO VARCHAR2(10)); -- 데이터가 있는 컬럼은 서로 다른 데이터 타입 변경 불가.
+ALTER TABLE STUDENT_BACKUP MODIFY (TOTAL VARCHAR2(10));  -- 비어있는 컬럼은 얼마든지 서로 다른 데이터 타입으로 변경 가능
+ALTER TABLE STUDENT_BACKUP MODIFY (STUDNO NUMBER(2));    -- 더 작은 사이즈 변경 거의 불가. 저장되어있는 데이터의 경우에 따라 가능할 수도 있다. 예를 들어 NUMBER(20)에서 AAAA등과 같이 한참 모자란다면 NUMBER(10)으로 변경은 가능.\
+
+-- 4) 컬럼 삭제
+ALTER TABLE 테이블명 DROP COLUMN 컬럼이름; -- DROP COLUMN으로 날린 컬럼은 복구 불가능하다. 휴지통에 들어가 있지 않음. CF) DROP TABLE은 휴지통에 있어서 복구 가능
+ALTER TABLE STUDENT_BACKUP DROP COLUMN JUMSU2;
+ALTER TABLE STUDENT_BK DROP COLUMN GENDER;
+SELECT * FROM STUDENT_BACKUP;
+
+
+-- 연습문제 ) STUDENT 테이블과 같은 백업 테이블을 만들고
+-- JUMIN 컬럼을 다음과 같이 수정하여라 901201-XXXXXXX
+-- 만약 수정이 안된다면 원인을 파악한 후에 해결할 수 있도록..
+CREATE TABLE STUDENT_BK AS SELECT * FROM STUDENT;
+SELECT * FROM STUDENT_BK;
+DESC STUDENT_BK;
+ALTER TABLE STUDENT_BK MODIFY (JUMIN CHAR(14));
+UPDATE STUDENT_BK
+   SET JUMIN = SUBSTR(JUMIN,1,6)||'-XXXXXXX';
+   
+-- SOL1) CHAR(13) -> CHAR(14)
+ALTER TABLE STUDENT_BK MODIFY (JUMIN CHAR(14));
+UPDATE STUDENT_BK
+   SET JUMIN = SUBSTR(JUMIN,1,6)||'-'||SUBSTR(JUMIN,7,7); -- CAHR타입 : SUBSTR(JUMIN,7) : 공백이 삽입이 되어서 오류가 난다. 즉 '-'자리를 공백이 먹어버린다는 뜻. SUBSTR(JUMIN,7,7) : 정확히 기입을 해줘야 한다.
+   
+ -- SOL1) CHAR(13) -> VARCHAR2(14)
+ALTER TABLE STUDENT_BK MODIFY (JUMIN VARCHAR(14));
+UPDATE STUDENT_BK
+   SET JUMIN = SUBSTR(JUMIN,1,6)||'-'||SUBSTR(JUMIN,7); -- 오류안남. 이유 --** VARCHAR2와 CHAR의 차이 SELECT LENGTH(COL2) AS 가변형문자타입, --'A'  LENGTH(COL3) AS 고정형문자타입  --'A         '
+
+CREATE TABLE STUDENT_BK1 AS SELECT * FROM STUDENT;
+ALTER TABLE STUDENT_BK1 MODIFY (JUMIN CHAR(14));
+UPDATE STUDENT_BK1
+   SET JUMIN = SUBSTR(JUMIN,1,6)||'-'||SUBSTR(JUMIN,7,7);
+   
+   SELECT * FROM STUDENT_BK1;
+ROLLBACK;
+-- 연습문제2) 위 테이블에 GENDER라는 컬럼을 추가하고
+-- 각 학생의 성별을 '남', '여' 값으로 수정하여라.
+CREATE TABLE STUDENT_BK2
+AS
+SELECT *
+  FROM STUDENT;
+ALTER TABLE STUDENT_BK2 MODIFY (JUMIN CHAR(14));
+UPDATE STUDENT_BK2
+   SET JUMIN = SUBSTR(JUMIN,1,6)||'-'|| SUBSTR(JUMIN,7,1)||'XXXXXX';  
+  
+ALTER TABLE STUDENT_BK2 ADD (GENDER VARCHAR2(2));
+SELECT * FROM STUDENT_BK2;
+UPDATE STUDENT_BK2
+   SET GENDER = DECODE(SUBSTR(JUMIN,8,1),'1','남','여');
+VAR=0;
+
+

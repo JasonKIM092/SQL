@@ -1,0 +1,426 @@
+[HEADER]
+VERSION=6.0.1
+TOOL=
+CHAR=ASCII
+DATE=2019-09-05 17:46
+[WORKSPACE]
+COUNT=4
+NAME=SQL1
+STMT=56
+--1. student3 테이블을 만들고 비만여부를 나타내는 컬럼을 새로 추가하고, 
+--각 학생들의 비만정보를 update 하여라.
+--비만여부는 체중이 표준체중보다 크면 과체중, 작으면 저체중, 같으면 표준으로 분류하여라.
+-- *표준체중 = (키-100)*0.9
+CREATE TABLE STUDENT3 AS SELECT * FROM STUDENT;
+SELECT * FROM STUDENT3;
+ALTER TABLE STUDENT3 ADD (BIMAN VARCHAR2(10));
+
+SELECT NAME, HEIGHT, WEIGHT, 
+       CASE WHEN WEIGHT > (HEIGHT-100)*0.9 THEN '과체중'
+            WHEN WEIGHT < (HEIGHT-100)*0.9 THEN '저체중'
+                                           ELSE '표준'
+        END AS 비만여부
+  FROM STUDENT3;
+
+UPDATE STUDENT3
+   SET BIMAN =  CASE WHEN WEIGHT > (HEIGHT-100)*0.9 THEN '과체중'
+                     WHEN WEIGHT < (HEIGHT-100)*0.9 THEN '저체중'
+                                                    ELSE '표준'
+                END;-- 아래식보다 성능상 우월함.
+
+UPDATE STUDENT3 S1
+   SET BIMAN =  (SELECT CASE WHEN WEIGHT > (HEIGHT-100)*0.9 THEN '과체중'
+                             WHEN WEIGHT < (HEIGHT-100)*0.9 THEN '저체중'
+                                                            ELSE '표준'
+                         END
+                   FROM STUDENT3 S2 -- 에러발생 : 한 행씩 처리를 해줘야 함.. 그래서 WHERE절 필요
+                  WHERE S1.STUDNO = S2. STUDNO); -- 이렇게해줘야 실행됨. 근데 성능상 안좋음
+
+--2. user_tab_columns 뷰를 사용하여 desc emp 결과와 동일하게 출력
+DESC EMP;
+SELECT COLUMN_NAME AS "Column",
+       DECODE(NULLABLE,'N','NOT NULL') AS "Nullable",
+       CASE DATA_TYPE WHEN 'NUMBER' THEN DATA_TYPE||'('
+                                         ||DATA_PRECISION||
+                                         DECODE(DATA_SCALE,0,NULL,','||DATA_SCALE)
+                                         ||')'
+                      WHEN 'DATE'   THEN DATA_TYPE
+                                    ELSE DATA_TYPE||'('||DATA_LENGTH||')'
+        END AS "Type"
+  FROM USER_TAB_COLUMNS
+ WHERE TABLE_NAME = 'EMP';
+
+--3. 다음의 쿼리를 실행한 후 중복된 데이터를 모두 삭제하는 쿼리를 작성하여라.
+--INSERT INTO STUDENT4 SELECT * FROM STUDENT3 WHERE DEPTNO1 = 101;
+
+INSERT INTO STUDENT3 SELECT * FROM STUDENT3 WHERE DEPTNO1 = 101;
+COMMIT;
+
+DELETE FROM STUDENT3
+WHERE STUDNO IN (SELECT STUDNO
+                   FROM STUDENT3
+                  GROUP BY STUDNO
+                 HAVING COUNT(STUDNO)>=2);
+COMMIT;
+SELECT * FROM STUDENT3;
+VAR=0
+NAME=SQL2
+STMT=242
+INDEX : SELECT시 찾고자 하는 데이터를 더 빠르게 찾게 도와주는 색인 기능을 갖는 객체
+ - 주로 WHERE절에서 자주 참조하는 컬럼을 대상으로 생성
+ - ROWID라는 각 행별 고유 주소값을 같는 형태로 생성
+ - 인덱스 스캔을 통해 찾고자 하는 행의 주소를 먼저 찾고 테이블을 스캔
+ - 인덱스에 원하는 정보가 모두 있을 경우 테이블 스캔 생략 가능
+; 
+-- ROWID 확인
+--예제) STUDENT 테이블에서 각 학생의 이름, 학년, 키와 몸무게 정보를 출력할때
+--검색에 유리한 인덱스를 생성하여라
+CTRL + E; -- 옵티마이져로 COST 및 ACCESS확인. 실행 계획 확인 방법
+SELECT ROWID, STUDNO, NAME, GRADE, HEIGHT, WEIGHT
+  FROM STUDENT3
+ WHERE STUDNO = 9412;
+
+SELECT STUDNO, ROWID
+  FROM STUDENT3;
+
+-- 인덱스 생성
+CREATE INDEX 인덱스명 ON 테이블명(컬럼1, 컬럼2, ...);
+CREATE INDEX IDX_STD3_STDNO ON STUDENT3(STUDNO);
+
+-- 인덱스 삭제
+DROP INDEX 인덱스명;
+DROP INDEX IDX_STD3_STDNO;
+
+
+SELECT EMPNO, ROWID
+  FROM EMP;
+  
+-- 인덱스 종류
+-- 1) UNIQUE INDEX : 인덱스를 구성하는 컬럼이 UNIQUE할 경우 생성 가능 => UNIQUE SCAN 발생 / 1줄만 읽고 파악함
+CREATE UNIQUE INDEX IDX_STD3_NAME ON STUDENT3(NAME);
+
+SELECT *
+  FROM STUDENT3
+ WHERE NAME = '서재수'; -- 동명이인이 있으면 사용할 수 없다. UNIQUE INDEX를 못쓴다. PRIMARY KEY와 관련. COST0
+ 
+-- 2) NON UNIQUE INDEX : 인덱스를 구성하는 컬럼이 UNIQUE하지 않는 경우 생성 => RANGE SCAN 발생 / 여러줄을 읽고 파악함
+DROP INDEX IDX_STD3_NAME;
+CREATE INDEX IDX_STD3_NAME ON STUDENT3(NAME);
+
+SELECT *
+  FROM STUDENT3
+ WHERE NAME = '서재수'; -- COST1
+
+-- 3) DESCENDING INDEX : 인덱스를 생성할 때 정렬 순서를 내림차순으로 생성하는 인덱스 <-> 기본이 ASCENDING INDEX
+--    - DESCENDING INDEX : 최신날짜 조회할때. 주로 은행사에서 계좌조회할때.
+-- 4) COMPOSITE INDEX : 여러 컬럼으로 인덱스를 생성하는 경우(컬럼순서 매우 중요)
+-- 5) FBI(FUNCTION BASED INDEX) : 함수의 결과를 기반으로 생성하는 인덱스
+
+
+-- 예제) STUDENT3 테이블에서 여학생에 대한 정보 출력, 그에 따른 인덱스 생성
+CREATE INDEX IDX_STD3_JUMIN ON STUDENT3(JUMIN);
+
+SELECT JUMIN, ROWID
+  FROM STUDENT3;
+
+SELECT NAME, GRADE
+  FROM STUDENT3
+ WHERE SUBSTR(JUMIN,7,1) = 2; -- 이런식으로 문자를 중간에 추출하는 경우는 인덱스를 위와 같이 만들어도 이용하지 못한다. 따로 해당관련 인덱스를 생성해야 한다. FBI 인덱스.
+                              
+ 
+
+CREATE INDEX IDX_STD3_JUMIN_FBI ON STUDENT3(SUBSTR(JUMIN,7,1)); -- FBI 인덱스
+
+SELECT SUBSTR(JUMIN,7,1), ROWID
+  FROM STUDENT3
+ ORDER BY 1;
+
+SELECT NAME, GRADE
+  FROM STUDENT3
+ WHERE SUBSTR(JUMIN,7,1) = 2; -- FBI 인덱스 만들었음에도 FULL SCAN을 한다... 인덱스 경로를 타지 않은 이유 : 1 - filter(TO_NUMBER(SUBSTR("JUMIN",7,1))=2) : 묵시적 형변환(TO_NUMBER를 씌움). 
+ 
+ SELECT NAME, GRADE
+  FROM STUDENT3
+ WHERE SUBSTR(JUMIN,7,1) = '2'; -- 주민컬럼은 데이터 타입이 문자인데 이렇게 문자로 바꿔줘야 한다. 묵시적형변환이 일어나는 순간 성능상 문제가 생김. 묵시적형변환이 인덱스 컬럼(WHERE절, WHERE SUBSTR(JUMIN,7,1))에서 일어났다. 인덱스 컬럼(WHERE절, WHERE SUBSTR(JUMIN,7,1))에 변형이 일어나서 인덱스를 타지 못하는 상황 = INDEX SUPPRESSING ERROR.
+ --인덱스 베이스 컬럼(WHERE절)에 변형이 와서는 안된다.
+
+
+-- 참고) 세부 실행계획 확인 방법
+--1) 세션 옵션 변경
+ALTER SESSION SET STATISTICS_LEVEL=ALL;
+
+--2) 확인하고자 하는 쿼리 수행
+SELECT NAME, GRADE
+  FROM STUDENT3
+ WHERE SUBSTR(JUMIN,7,1) = 2; -- TEXT OUTPUT으로 RESULT 창을 바꿔주고 실행시킨다.
+
+--3) 실행계획 확인(ORANGE에서 수행 시 아래 출력 결과 탭을 TEXT OUTPUT으로 변경 후 실행)
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(NULL,NULL,'ALLSTATS LAST'));
+
+-- SCAN 종류
+-- 1) TABLE FULL SCAN : 테이블 전체 스캔
+-- 2) INDEX UNIQUE SCAN : 인덱스의 한 건 확인
+-- 3) INDEX RANGE SCAN : 인덱스의 두 건 이상 확인
+-- 4) INDEX SKIP SCAN 
+--   : 결합인덱스의 경우 인덱스 첫 번째 컬럼을 WHERE절에 명시하지 않은 경우
+-- 예제)
+-- STUDENT3 테이블에서 학년, 성별의 정보를 갖는 결합 인덱스 생성 후 아래 쿼리 실행계획 확인
+CREATE INDEX IDX_STD3_GRADE_FBI ON STUDENT3(GRADE, SUBSTR(JUMIN,7,1));
+ SELECT GRADE, SUBSTR(JUMIN,7,1), ROWID
+   FROM STUDENT3
+  ORDER BY 1,2;
+  
+ SELECT NAME, GRADE, SUBSTR(JUMIN,7,1)
+   FROM STUDENT3
+  WHERE SUBSTR(JUMIN,7,1) = '2'; -- 각 GRADE마다 여학생을 찾기위해 SUBSTR(JUMIN,7,1) 컬럼을 돌아다니며 스캔한다.
+ 
+ SELECT /*+ INDEX_SS(A IDX_STD3_GRADE_FBI) */ NAME, GRADE, SUBSTR(JUMIN,7,1)  -- /*+ INDEX_SS(A IDX_STD3_GRADE_FBI)*/ 힌트. 주석처리 아님. 파싱함. 옵티마이져가 수행하는 방식이 비효율적이라고 판단할때 타 방식으로 수행할 수 있도록 튜닝하는 형식. SS : 스킵스캔
+   FROM STUDENT3 A
+  WHERE SUBSTR(JUMIN,7,1) = '2';
+  
+-- 5) INDEX (FAST) FULL SCAN
+--   : 인덱스를 스캔하긴 하나 전체를 스캔하는 경우
+  
+  
+
+
+
+
+-- 인덱스 뷰
+SELECT *
+  FROM USER_INDEXES
+ WHERE TABLE_NAME = 'STUDENT'; -- 컬럼에 대한 정보가 없다. 인덱스에 대한 정보만 있다.
+
+SELECT *
+  FROM USER_IND_COLUMNS; -- 컬럼에 대한 정보 有. COLUMN_POSITION : 결합인덱스일 경우 컬럼의 순서.
+  
+SELECT *
+  FROM USER_INDEXES I1, USER_IND_COLUMNS I2
+ WHERE I1.INDEX_NAME = I2.INDEX_NAME
+   AND I1.TABLE_NAME = 'STUDENT3';
+   
+SELECT I1.INDEX_NAME,
+       I1.INDEX_TYPE,
+       I2.COLUMN_NAME,
+       I2.COLUMN_POSITION,
+       I1.TABLE_NAME
+  FROM USER_INDEXES I1, USER_IND_COLUMNS I2
+ WHERE I1.INDEX_NAME = I2.INDEX_NAME
+   AND I1.TABLE_NAME = 'STUDENT3';
+   
+SELECT * FROM MEMBER2;
+SELECT * FROM BOARD;
+INSERT INTO BOARD VALUES (1111,'나는 누구인가?','나는 누구인가?',SYSDATE,'WHO_AM_I');
+INSERT INTO BOARD VALUES (2222,'난뉴규여긴어디','나멍미',SYSDATE,'I_LOVE_ME');
+INSERT INTO BOARD VALUES (3333,'나 지금 어디임','넌 어딘데',SYSDATE,'DOCTOR_WHO');
+
+DROP TABLE MEMBER2;
+DROP TABLE BOARD;
+
+CREATE TABLE MEMBER2
+(USERID   VARCHAR2(10) CONSTRAINT USER_ID_PK   PRIMARY KEY,
+ USERNAME VARCHAR2(10) CONSTRAINT USER_NAME_NN NOT NULL,
+ PASSWD   VARCHAR2(10) CONSTRAINT PASSWORD_NN  NOT NULL,
+ IDNUM    VARCHAR2(13) CONSTRAINT ID_NUMBER_UK UNIQUE,
+ PHONE    NUMBER(13),
+ ADDRESS  VARCHAR2(20),
+ REGDATE  DATE DEFAULT SYSDATE,
+ INTEREST VARCHAR2(15));
+ 
+CREATE TABLE BOARD
+(NO      NUMBER(4)    CONSTRAINT 게시물번호 PRIMARY KEY,
+ SUBJECT VARCHAR2(50) CONSTRAINT 제목       NOT NULL,
+ CONTENT VARCHAR2(100),
+ RDATE   DATE,
+ USERID  VARCHAR2(10) CONSTRAINT USER_ID_FK REFERENCES MEMBER2(USERID));
+ 
+INSERT INTO MEMBER2 VALUES ('I_LOVE_ME','JAY KIM','123456789','9001231234567','01012345678','S.KOREA SEOUL',SYSDATE,'GYM');
+INSERT INTO MEMBER2 VALUES ('WHO_AM_I','JASON KIM','1122334455','9101231234567','01012345555','S.KOREA SEOUL',SYSDATE,'GYM');
+INSERT INTO MEMBER2 VALUES ('DOCTOR_WHO','JAMES KIM','111222333','9201231234567','01012346666','S.KOREA SEOUL',SYSDATE,'GYM');
+INSERT INTO MEMBER2 VALUES ('i_love_you','JAKE KIM','1881881','9301231234567','01012347777','S.KOREA SEOUL',SYSDATE,'GYM');
+
+ 
+--1. 회원테이블(MEMBER2)와 게시판테이블(BOARD)를 참조하여 다음의 인덱스를 생성하여라
+--1) 회원테이블 REGDATE칼럼에 대해 인덱스를 생성하여라
+CREATE INDEX IDX_MMB2_RGD ON MEMBER2(REGDATE);
+
+SELECT USERID
+  FROM MEMBER2
+ WHERE REGDATE = TO_DATE('2019/09/05','YYYY/MM/DD');
+
+--2) 게시판 테이블의 USERID 칼럼에 대해 인덱스를 생성하여라
+CREATE INDEX IDX_BOD_UID ON BOARD(USERID);
+
+SELECT NO
+  FROM BOARD
+ WHERE USERID = 'WHO_AM_I';
+
+--3) 회원 테이블의 INTEREST와 USERNAME컬럼에 대해 결합 인덱스를 생성하여라
+CREATE INDEX IDX_MMB2_USERNAME_SS ON MEMBER2(USERNAME, INTEREST); -- 상식적으로 선두컬럼으로 두는 것은 USERNAME이다. 이유는 INTEREST는 중복될 확률이 높다. DISTINCT VALUE가 많을 수록 UNIQUE하다. DISTINCT VALUE(중복제거한 것의 갯수)의 갯수가 큰 컬럼이 선두컬럼인 것이 좋다.
+
+ SELECT USERNAME, INTEREST, USERID
+   FROM MEMBER2
+  WHERE USERNAME='JASON KIM';
+  
+--4) 회원 테이블의 USERID 컬럼에 대해 UPPER 함수를 적용한 함수 기반 인덱스를 생성하여라.
+CREATE INDEX IDX_MMB2_USERID_FBI ON MEMBER2(UPPER(USERID));
+
+SELECT USERNAME
+  FROM MEMBER2
+ WHERE USERID = 'i_love_you';
+ 
+ 
+-- 연습문제) STUDENT 테이블에서 BIRTHDAY 컬럼을 이용하여 1978년 01월에 태어난 학생의
+-- 이름, 학년, ID를 찾는 쿼리를 작성하고
+-- 적절한 인덱스 생성으로 해당 쿼리가 인덱스를 스캔할 수 있도록 만들어보자(FBI아님)
+CREATE INDEX IDX_STD_BIRTH ON STUDENT(BIRTHDAY);
+
+SELECT NAME,GRADE,ID
+  FROM STUDENT
+ WHERE BIRTHDAY >= TO_DATE('197801','YYYYMM')  -- 1978/01/01 00:00:00. TO_DATE는 년월일 다 출력된다. 그래서 TO_DATE('197801','YYYYMM')를 출력해보면 1978/01/01로 출력이 된다.
+   AND BIRTHDAY < TO_DATE('197802','YYYYMM');  -- 1978/02/01 00:00:00. 날짜는 대소로 풀어서 하는게 가끔 있다. 날짜는 응용하는 것까지 고려해볼것!!
+
+SELECT * FROM STUDENT;
+
+-- 기타 오브젝트
+--1. 시노님 : 테이블 별칭을 만들어 별칭으로만 테이블을 조회할 수 있도록 만든 오브젝트
+타 계정에서 SCOTT.EMP테이블을 EMP로 바로 조회할 수 있도록 만든 오브젝트
+--예제) HR계정 -> SCOTT 계정의 EMP 테이블 조회 시도 : 권한이 없습니다 메시지 뜸
+--1) 권한부여
+   GRANT 권한(SELECT,UPDATE,DELETE,INSERT,MERGE) ON 테이블명 TO 유저명;
+   GRANT SELECT ON SCOTT.EMP TO HR;
+--2) 테이블 풀 네임(유저명.테이블명)으로 조회 시도
+SELECT * FROM SCOTT.EMP;
+--3) 시노님 생성 후 테이블명으로만 조회 시도
+CREATE [PUBLIC] SYNONYM 별칭 FOR 테이블명;
+CREATE PUBLIC SYNONYM 별칭 FOR 테이블명; -- 별칭 : EMP, 테이블명 : SCOTT.EMP
+CREATE PUBLIC SYNONYM EMP FOR SCOTT.EMP;
+
+--HR계정에서..
+--SYNONYM 설정 이전
+--SELECT * FROM EMP; -- FULL NAME이 아니라서 그렇다. 
+--SELECT * FROM SCOTT.EMP; -- 이렇게 써야한다.
+
+--SYNONYM을 CREATE PUBLIC SYNONYM EMP FOR SCOTT.EMP; 이렇게 설정하면
+--SELECT * FROM EMP; 얘도 조회가 가능해진다.
+
+-- 연습문제) SCOTT계정에서 HR계정의 EMPLOYEES 테이블을 볼 수 있도록 하여라.
+GRANT SELECT ON HR.EMPLOYEES TO SCOTT;
+CREATE PUBLIC SYNONYM EMPLOYEES FOR HR.EMPLOYEES; -- SYSTEM 계정에서도 할 수 있다. 혹은 SYSTEM계정에서 GRANT DBA TO HR; 이 권한을 부여하고 HR계정에서 수행한다.
+SELECT * FROM EMPLOYEES;
+VAR=1
+:SELECT시=0,
+NAME=SQL3
+STMT=2
+-- 권한부여 : SYSTEM 계정에서 수행
+GRANT DBA TO HR;
+VAR=0
+NAME=SQL4
+STMT=106
+--1. 다음을 수행 한 후 중복된 데이터를 삭제하되 한 건은 남기도록 하여라(전부삭제X)
+create table STUDENT_TEST as select * from STUDENT;
+insert into STUDENT_TEST select * from STUDENT where deptno1 = 101;
+insert into STUDENT_TEST select * from STUDENT where deptno1 = 101;
+commit;
+
+create table STUDENT_TEST1 as select * from STUDENT;
+insert into STUDENT_TEST1 select * from STUDENT where deptno1 = 101;
+insert into STUDENT_TEST1 select * from STUDENT where deptno1 = 101;
+commit;
+
+SELECT * FROM STUDENT_TEST;
+
+SELECT DISTINCT ROWID, STUDNO, NAME, GRADE, HEIGHT, WEIGHT
+  FROM STUDENT_TEST
+ WHERE DEPTNO1 = 101
+ ORDER BY NAME;
+ 
+DELETE FROM STUDENT_TEST
+ WHERE ROWID LIKE 'AAASOdAAEAAAARW%';
+
+
+--2. 다음과 같은 정보를 갖는 쿼리 작성(뷰들 활용)
+--테이블명     pk이름          pk컬럼     인덱스수
+--EMP2	    SYS_C0011047	   DEPTNO	        2
+--STUDENT	SYS_C0011043	   GRADE	        8
+--TEST       .                  .               0
+
+-- 제약조건 확인 뷰
+-- 1) 테이블에 컬럼마다 설정된 제약조건 이름과 종류 확인
+SELECT * 
+  FROM USER_CONSTRAINTS
+ WHERE TABLE_NAME = 'STUDENT'; -- 어떠한 컬럼인지(컬럼이름. 즉 컬럼 정보) 알 수 없다. 어떤 제약조건이 걸려잇는지만 알 수 있다.
+ SYS_C0011047
+ 
+ ;
+ 
+-- 2) 제약조건 이름마다 어떤 컬럼에 설정되어 있는지 확인
+SELECT *
+  FROM USER_CONS_COLUMNS
+ WHERE TABLE_NAME = 'STUDENT';
+ 
+-- 컬럼 속성을 확인할 수 있는 뷰
+SELECT COLUMN_NAME,     -- 컬럼이름
+       DATA_TYPE,       -- 컬럼 데이터 타입
+       DATA_LENGTH,     -- 문자형일 경우 총 자리수(사이즈)
+       DATA_PRECISION,  -- 숫자형일 경우 총 자리수(사이즈)
+       DATA_SCALE,      -- 숫자형일 경우 소수점 자리수
+       NULLABLE,        -- NOT NULL 여부(N : NOT NULL, Y : NULLABLE)
+       DATA_DEFAULT     -- DEFAULT 값
+  FROM USER_TAB_COLUMNS
+ WHERE TABLE_NAME = 'STUDENT';
+
+SELECT *
+  FROM USER_TAB_COLUMNS
+ WHERE TABLE_NAME = 'EMP';
+ 
+ -- 인덱스 뷰
+SELECT *
+  FROM USER_INDEXES;
+ WHERE TABLE_NAME IN ('STUDENT','EMP2')
+   --AND COLUMN_NAME = 'GRADE'
+   ; -- 컬럼에 대한 정보가 없다. 인덱스에 대한 정보만 있다.
+
+SELECT *
+  FROM USER_IND_COLUMNS;
+   WHERE TABLE_NAME IN ('STUDENT','EMP2')
+     ; -- 컬럼에 대한 정보 有. COLUMN_POSITION : 결합인덱스일 경우 컬럼의 순서.
+  
+SELECT *
+  FROM USER_INDEXES I1, USER_IND_COLUMNS I2
+ WHERE I1.INDEX_NAME = I2.INDEX_NAME
+   AND I1.TABLE_NAME = 'STUDENT3';
+   
+SELECT I1.INDEX_NAME,
+       I1.INDEX_TYPE,
+       I2.COLUMN_NAME,
+       I2.COLUMN_POSITION,
+       I1.TABLE_NAME
+  FROM USER_INDEXES I1, USER_IND_COLUMNS I2
+ WHERE I1.INDEX_NAME = I2.INDEX_NAME
+   AND I1.TABLE_NAME = 'STUDENT3';
+
+--3. student 테이블을 이용하여 적정체중이 75 이상인 사람의 수를 구하는
+-- 쿼리를 작성하고 해당 쿼리가 인덱스를  정상적으로 scan하도록
+-- 만들어라(인덱스 추가 생성 가능)
+-- 단, 적정체중은 (키 - 100)*0.9를 의미한다.
+SELECT * FROM STUDENT;
+SELECT (HEIGHT-100)*0.9 BIMANDO, COUNT(STUDNO)
+  FROM STUDENT
+ WHERE (HEIGHT-100)*0.9 >= 75
+ GROUP BY (HEIGHT-100)*0.9;
+
+CREATE INDEX IDX_STD_BMD_FBI ON STUDENT((HEIGHT-100)*0.9);
+
+--4. 다음 인덱스를 생성한 후 아래 쿼리가 해당 인덱스를 스캔할 수 있도록 변경하여라.
+create index idx_std_grade_height on STUDENT(grade, height);
+
+select GRADE, HEIGHT, name, studno
+  from student
+ where height > 178;
+ 
+SELECT NAME, STUDNO
+  FROM STUDENT
+ WHERE height > 178
+   AND GRADE = GRADE;
+VAR=0
